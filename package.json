@@ -1,0 +1,51 @@
+{
+  "name": "vue-globe",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Globo WebGL para Vue 3, com regiões customizáveis.",
+  "author": {
+    "name": "Gabriel Carlos Ferreira",
+    "email": "gabriel.developed@gmail.com",
+    "url": "https://gbrldev.com"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/vue-globe.js"
+    },
+    "./style.css": "./dist/vue-globe.css"
+  },
+  "main": "./dist/vue-globe.js",
+  "module": "./dist/vue-globe.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --build && vite build",
+    "type-check": "vue-tsc --build",
+    "preview": "vite preview"
+  },
+  "peerDependencies": {
+    "three": "^0.184.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.4",
+    "@types/node": "^24.12.2",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/tsconfig": "^0.9.1",
+    "three": "^0.184.0",
+    "typescript": "~6.0.0",
+    "vite": "^8.0.8",
+    "vite-plugin-dts": "^4.5.4",
+    "vue": "^3.5.32",
+    "vue-tsc": "^3.2.6"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}
