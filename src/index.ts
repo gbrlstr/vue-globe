@@ -2,10 +2,12 @@ import Globe from './components/Globe.vue'
 
 export { Globe }
 export default Globe
-export { defaultTheme } from './types'
+export { defaultConfig, resolveConfig } from './types'
 export type {
+  GlobeCamera,
+  GlobeColors,
+  GlobeConfig,
   GlobeMarker,
-  GlobeTheme,
   MultiPolygonGeometry,
   PolygonGeometry,
   Position,

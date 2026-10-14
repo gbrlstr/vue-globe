@@ -1,23 +1,19 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { GlobeView } from '@/engine/view'
-import { defaultTheme, type GlobeMarker, type GlobeTheme, type Region } from '@/types'
+import { resolveConfig, type GlobeConfig, type GlobeMarker, type Region } from '@/types'
 
 const props = withDefaults(
   defineProps<{
     regions?: Region[]
     markers?: GlobeMarker[]
-    theme?: Partial<GlobeTheme>
-    autoRotate?: boolean
-    interaction?: boolean
+    config?: Partial<GlobeConfig>
   }>(),
   {
     regions: () => [],
     markers: () => [],
-    theme: () => ({}),
-    autoRotate: true,
-    interaction: true,
+    config: () => ({}),
   },
 )
 
@@ -30,6 +26,7 @@ const emit = defineEmits<{
 
 const rootRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const resolved = computed(() => resolveConfig(props.config))
 
 let view: GlobeView | undefined
 
@@ -37,9 +34,7 @@ function sync() {
   view?.setOptions({
     regions: props.regions,
     markers: props.markers,
-    theme: { ...defaultTheme, ...props.theme },
-    autoRotate: props.autoRotate,
-    interaction: props.interaction,
+    config: resolved.value,
   })
 }
 
@@ -74,14 +69,24 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [props.regions, props.markers, props.theme, props.autoRotate, props.interaction] as const,
-  sync,
+  () => props.config,
+  () => sync(),
+  { deep: true },
+)
+watch(
+  () => props.regions,
+  () => sync(),
+  { deep: true },
+)
+watch(
+  () => props.markers,
+  () => sync(),
   { deep: true },
 )
 </script>
 
 <template>
-  <div ref="rootRef" class="vue-globe">
+  <div ref="rootRef" class="vue-globe" :style="{ background: resolved.colors.background }">
     <canvas ref="canvasRef" />
   </div>
 </template>
@@ -94,7 +99,6 @@ watch(
   min-height: 100%;
   overflow: hidden;
   cursor: grab;
-  background: #061018;
 }
 
 .vue-globe canvas {

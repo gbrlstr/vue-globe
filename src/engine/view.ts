@@ -25,7 +25,7 @@ import specularMapUrl from '@/assets/textures/specular_map.webp?url'
 import bumpMapUrl from '@/assets/textures/bump_map.webp?url'
 import normalMapUrl from '@/assets/textures/normal_map.webp?url'
 import worldUrl from '@/assets/data/world-main.json?url'
-import { defaultTheme, type GlobeMarker, type GlobeTheme, type Region } from '@/types'
+import { defaultConfig, type GlobeConfig, type GlobeMarker, type Region } from '@/types'
 
 import {
   buildRings,
@@ -42,15 +42,10 @@ import { findRegion, GLOBE_RADIUS, latLngToSphere } from './geo'
 import { createFillSphereMaterial, createGlobeMaterial } from './globeShader.js'
 import { HeatMap } from './heatmap'
 
-const BORDER_OPACITY = 0.55
-const FILL_OPACITY = 0.55
-
 export interface GlobeViewOptions {
   regions: Region[]
   markers: GlobeMarker[]
-  theme: GlobeTheme
-  autoRotate: boolean
-  interaction: boolean
+  config: GlobeConfig
 }
 
 export interface GlobeViewHandlers {
@@ -70,6 +65,7 @@ export class GlobeView {
   private readonly loader = new TextureLoader()
 
   private globe: Mesh | null = null
+  private atmosphere: Mesh | null = null
   private shader: ShaderMaterial | null = null
   private heat: HeatMap | null = null
   private countries = new Group()
@@ -88,12 +84,11 @@ export class GlobeView {
   private options: GlobeViewOptions = {
     regions: [],
     markers: [],
-    theme: defaultTheme,
-    autoRotate: true,
-    interaction: true,
+    config: defaultConfig,
   }
 
-  private distance = 5.35
+  private cameraKey = ''
+  private distance = defaultConfig.camera.distance
   private yaw = 0
   private pitch = 0.15
   private dragging = false
@@ -122,8 +117,8 @@ export class GlobeView {
     this.renderer.toneMappingExposure = 1.25
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
 
-    this.camera = new PerspectiveCamera(40, 1, 0.1, 100)
-    this.lookAt(-18, -58)
+    this.camera = new PerspectiveCamera(defaultConfig.camera.fov, 1, 0.1, 100)
+    this.lookAt(defaultConfig.camera.lat, defaultConfig.camera.lng)
     this.scene.add(this.countries, this.customLines)
 
     this.resize()
@@ -140,11 +135,15 @@ export class GlobeView {
   }
 
   setOptions(options: GlobeViewOptions) {
-    const themeChanged = options.theme.border !== this.options.theme.border || options.theme.fill !== this.options.theme.fill
+    const regionsChanged = this.regionsStamp(options.regions) !== this.regionsStamp(this.options.regions)
     this.options = options
     if (!this.loaded) return
-    if (themeChanged) this.applyTheme()
-    this.rebuildCustomLines()
+    this.applyAppearance()
+    if (regionsChanged) this.rebuildCustomLines()
+  }
+
+  private regionsStamp(regions: Region[]) {
+    return regions.map((region) => `${region.id}:${region.border ?? ''}:${region.fill ?? ''}:${region.locked ? 1 : 0}`).join('|')
   }
 
   focus(id: string) {
@@ -217,7 +216,8 @@ export class GlobeView {
       )
       this.globe = new Mesh(buildSphere(GLOBE_RADIUS, 64, 64), this.shader)
       this.scene.add(this.globe)
-      this.scene.add(this.createAtmosphere())
+      this.atmosphere = this.createAtmosphere()
+      this.scene.add(this.atmosphere)
       this.createFillLayers()
 
       const world = await indexWorld(response)
@@ -228,6 +228,7 @@ export class GlobeView {
       this.addCountryLines(world.groups)
       this.loaded = true
       this.rebuildCustomLines()
+      this.applyAppearance()
       this.handlers.onReady()
     } catch (error) {
       console.error('[vue-globe] Falha ao montar o globo:', error)
@@ -268,8 +269,8 @@ export class GlobeView {
 
   private createFillLayers() {
     const geometry = buildSphere(GLOBE_RADIUS * 1.005, 64, 64)
-    const hover = this.makeFillLayer(geometry, 2, '#ffffff')
-    const selected = this.makeFillLayer(geometry, 3, this.options.theme.fill)
+    const hover = this.makeFillLayer(geometry, 2, this.options.config.colors.hover)
+    const selected = this.makeFillLayer(geometry, 3, this.options.config.colors.fill)
     this.hoverCtx = hover.ctx
     this.hoverTexture = hover.texture
     this.hoverMat = hover.material
@@ -294,12 +295,12 @@ export class GlobeView {
   }
 
   private addCountryLines(groups: CountryLines[]) {
-    const color = new Color(this.options.theme.border)
+    const color = new Color(this.options.config.colors.border)
     for (const group of groups) {
       const material = new LineBasicMaterial({
         color,
         transparent: true,
-        opacity: BORDER_OPACITY,
+        opacity: this.options.config.lineOpacity,
         depthTest: true,
         depthWrite: false,
       })
@@ -320,7 +321,7 @@ export class GlobeView {
     for (const region of this.options.regions) {
       const polygons = region.geometry.type === 'Polygon' ? [region.geometry.coordinates] : region.geometry.coordinates
       const material = new LineBasicMaterial({
-        color: region.border ?? this.options.theme.border,
+        color: region.border ?? this.options.config.colors.border,
         transparent: true,
         opacity: 0.9,
       })
@@ -334,11 +335,59 @@ export class GlobeView {
     }
   }
 
-  private applyTheme() {
-    const color = new Color(this.options.theme.border)
-    for (const material of this.materials.values()) material.color.copy(color)
-    const selectedColor = this.selectedMat?.uniforms.uColor
-    if (selectedColor) selectedColor.value = new Color(this.options.theme.fill)
+  private applyAppearance() {
+    const { config } = this.options
+    this.countries.visible = config.showLines
+    this.customLines.visible = config.showLines
+
+    const border = new Color(config.colors.border)
+    for (const [code, material] of this.materials) {
+      material.color.copy(border)
+      if (code !== this.hoveredId && code !== this.selectedId) material.opacity = config.lineOpacity
+    }
+
+    this.setColor('uOceanTint', config.colors.ocean, true)
+    this.setColor('uLandColor', config.colors.land)
+    this.setColor('uGridLineColor', config.colors.grid)
+    this.setNumber('uGridLineOpacity', config.showGrid ? config.gridOpacity : 0)
+    this.setNumber('uNoiseStrength', config.showClouds ? 0.9 : 0)
+    this.setNumber('uAutoCellOpacity', config.showCells ? 1 : 0)
+    this.setNumber('uHoverCellOpacity', config.showCells ? 1 : 0)
+
+    if (this.atmosphere) {
+      this.atmosphere.visible = config.showAtmosphere
+      const material = this.atmosphere.material
+      if (material instanceof ShaderMaterial && material.uniforms.uColor) {
+        material.uniforms.uColor.value = new Color(config.colors.atmosphere).convertLinearToSRGB()
+      }
+    }
+
+    if (this.hoverMat?.uniforms.uColor) this.hoverMat.uniforms.uColor.value = new Color(config.colors.hover)
+    if (this.selectedMat?.uniforms.uColor) this.selectedMat.uniforms.uColor.value = new Color(config.colors.fill)
+
+    if (this.camera.fov !== config.camera.fov) {
+      this.camera.fov = config.camera.fov
+      this.camera.updateProjectionMatrix()
+    }
+
+    const cameraKey = `${config.camera.lat}|${config.camera.lng}|${config.camera.distance}|${config.camera.fov}`
+    if (cameraKey !== this.cameraKey) {
+      this.cameraKey = cameraKey
+      this.distance = config.camera.distance
+      this.lookAt(config.camera.lat, config.camera.lng)
+    }
+  }
+
+  private setColor(name: string, hex: string, srgb = false) {
+    const uniform = this.shader?.uniforms[name]
+    if (!uniform) return
+    const color = new Color(hex)
+    uniform.value = srgb ? color.convertLinearToSRGB() : color
+  }
+
+  private setNumber(name: string, value: number) {
+    const uniform = this.shader?.uniforms[name]
+    if (uniform) uniform.value = value
   }
 
   private lookAt(lat: number, lng: number) {
@@ -372,8 +421,8 @@ export class GlobeView {
     const delta = this.elapsed ? Math.min((now - this.elapsed) / 1000, 0.05) : 0
     this.elapsed = now
 
-    if (this.options.autoRotate && !this.dragging) {
-      this.yaw += delta * 0.12
+    if (this.options.config.autoRotate && !this.dragging) {
+      this.yaw += delta * this.options.config.rotateSpeed
       this.applyOrbit()
     }
 
@@ -389,7 +438,7 @@ export class GlobeView {
   }
 
   private pick() {
-    if (!this.globe || !this.options.interaction) return null
+    if (!this.globe || !this.options.config.interactive) return null
     this.raycaster.setFromCamera(this.pointer, this.camera)
     const hit = this.raycaster.intersectObject(this.globe, false)[0]
     const mouse = this.shader?.uniforms.uMouseUV?.value as Vector2 | undefined
@@ -426,7 +475,7 @@ export class GlobeView {
   private setHover(id: string | null) {
     if (this.hoveredId && this.hoveredId !== this.selectedId) {
       const previous = this.materials.get(this.hoveredId)
-      if (previous) previous.opacity = BORDER_OPACITY
+      if (previous) previous.opacity = this.options.config.lineOpacity
     }
     this.hoveredId = id
     if (id && id !== this.selectedId) {
@@ -443,7 +492,7 @@ export class GlobeView {
     if (geometry) paintGeometry(this.hoverCtx, geometry, false)
     this.hoverTexture.needsUpdate = true
     const opacity = this.hoverMat.uniforms.uOpacity
-    if (opacity) opacity.value = geometry ? FILL_OPACITY : 0
+    if (opacity) opacity.value = geometry ? this.options.config.fillOpacity : 0
   }
 
   private paintSelected(id: string | null) {
@@ -456,7 +505,7 @@ export class GlobeView {
     }
     this.selectedTexture.needsUpdate = true
     const opacity = this.selectedMat.uniforms.uOpacity
-    if (opacity) opacity.value = geometry ? FILL_OPACITY : 0
+    if (opacity) opacity.value = geometry ? this.options.config.fillOpacity : 0
   }
 
   private geometryFor(id: string) {
@@ -468,7 +517,7 @@ export class GlobeView {
   }
 
   private onPointerDown = (event: PointerEvent) => {
-    if (!this.options.interaction) return
+    if (!this.options.config.interactive) return
     this.setPointer(event)
     this.dragging = true
     this.moved = false
@@ -499,7 +548,7 @@ export class GlobeView {
     if (!this.dragging) return
     this.setPointer(event)
     this.dragging = false
-    if (this.moved || !this.options.interaction) return
+    if (this.moved || !this.options.config.interactive) return
     const region = this.pick()
     if (region) {
       this.selectedId = region.id
@@ -512,7 +561,7 @@ export class GlobeView {
     }
     if (this.selectedId) {
       const material = this.materials.get(this.selectedId)
-      if (material) material.opacity = BORDER_OPACITY
+      if (material) material.opacity = this.options.config.lineOpacity
       this.selectedId = null
       this.paintSelected(null)
       this.handlers.onMiss()
