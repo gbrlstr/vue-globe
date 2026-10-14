@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { GlobeView } from '@/engine/view'
-import { resolveConfig, type GlobeConfig, type GlobeMarker, type Region } from '@/types'
+import { resolveConfig, type GlobeConfig, type GlobeMarker, type Region, type RegionPointerEvent } from '@/types'
 
 const props = withDefaults(
   defineProps<{
@@ -19,8 +19,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   ready: []
-  regionHover: [region: Region | null]
-  regionClick: [region: Region]
+  regionHover: [event: RegionPointerEvent | null]
+  regionClick: [event: RegionPointerEvent]
   pointerMiss: []
 }>()
 

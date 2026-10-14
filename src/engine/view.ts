@@ -25,7 +25,7 @@ import specularMapUrl from '@/assets/textures/specular_map.webp?url'
 import bumpMapUrl from '@/assets/textures/bump_map.webp?url'
 import normalMapUrl from '@/assets/textures/normal_map.webp?url'
 import worldUrl from '@/assets/data/world-main.json?url'
-import { defaultConfig, type GlobeConfig, type GlobeMarker, type Region } from '@/types'
+import { defaultConfig, type GlobeConfig, type GlobeMarker, type Region, type RegionPointerEvent } from '@/types'
 
 import {
   buildRings,
@@ -49,8 +49,8 @@ export interface GlobeViewOptions {
 }
 
 export interface GlobeViewHandlers {
-  onHover: (region: Region | null) => void
-  onClick: (region: Region) => void
+  onHover: (event: RegionPointerEvent | null) => void
+  onClick: (event: RegionPointerEvent) => void
   onMiss: () => void
   onReady: () => void
 }
@@ -454,11 +454,10 @@ export class GlobeView {
     if (lng < -180) lng += 360
 
     const custom = findRegion(this.options.regions, lng, lat)
-    if (custom) return custom
-
-    const feature = findFeatureAtLatLng(lat, lng, this.features)
-    if (!feature) return null
-    return this.toRegion(feature)
+    const feature = custom ? null : findFeatureAtLatLng(lat, lng, this.features)
+    const region = custom ?? (feature ? this.toRegion(feature) : null)
+    if (!region) return null
+    return { region, lat, lng }
   }
 
   private toRegion(feature: IndexedFeature): Region {
@@ -535,12 +534,12 @@ export class GlobeView {
       this.applyOrbit()
     }
 
-    const region = this.pick()
-    const nextId = region?.id ?? null
+    const hit = this.pick()
+    const nextId = hit?.region.id ?? null
     if (nextId !== this.hoveredId) {
       this.setHover(nextId)
-      this.handlers.onHover(region)
-      this.renderer.domElement.style.cursor = region ? 'pointer' : 'grab'
+      this.handlers.onHover(hit)
+      this.renderer.domElement.style.cursor = hit ? 'pointer' : 'grab'
     }
   }
 
@@ -549,14 +548,14 @@ export class GlobeView {
     this.setPointer(event)
     this.dragging = false
     if (this.moved || !this.options.config.interactive) return
-    const region = this.pick()
-    if (region) {
-      this.selectedId = region.id
-      const material = this.materials.get(region.id)
+    const hit = this.pick()
+    if (hit) {
+      this.selectedId = hit.region.id
+      const material = this.materials.get(hit.region.id)
       if (material) material.opacity = 1
-      this.paintSelected(region.id)
+      this.paintSelected(hit.region.id)
       this.paintHover(null)
-      this.handlers.onClick(region)
+      this.handlers.onClick(hit)
       return
     }
     if (this.selectedId) {

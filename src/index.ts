@@ -13,4 +13,5 @@ export type {
   Position,
   Region,
   RegionGeometry,
+  RegionPointerEvent,
 } from './types'

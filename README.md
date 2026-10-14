@@ -31,7 +31,22 @@ const config = {
 </template>
 ```
 
-Passe só o que quiser mudar. O restante usa o padrão do componente. O elemento pai precisa de largura e altura. `vue` e `three` são dependências do projeto que usa o componente.
+O clique não executa nenhuma ação dentro do globo. O evento chega no projeto, que decide o que fazer:
+
+```vue
+<script setup>
+function onClick({ region, lat, lng }) {
+  // region.id, region.name e region.data
+  // lat e lng do ponto clicado
+}
+
+function onHover(event) {
+  hovered.value = event?.region.name ?? ''
+}
+</script>
+```
+
+`@pointer-miss` dispara ao clicar fora de uma região. Passe só o que quiser mudar em `config`. O restante usa o padrão do componente. O elemento pai precisa de largura e altura. `vue` e `three` são dependências do projeto que usa o componente.
 
 ## Desenvolvimento
 

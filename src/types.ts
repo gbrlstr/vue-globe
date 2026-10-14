@@ -23,6 +23,12 @@ export interface Region {
   data?: unknown
 }
 
+export interface RegionPointerEvent {
+  region: Region
+  lat: number
+  lng: number
+}
+
 export interface GlobeMarker {
   id: string
   lat: number

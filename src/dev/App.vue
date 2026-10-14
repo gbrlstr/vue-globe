@@ -2,23 +2,33 @@
 import { reactive, ref } from 'vue'
 
 import Globe from '@/components/Globe.vue'
-import { defaultConfig, type Region } from '@/types'
+import { defaultConfig, type RegionPointerEvent } from '@/types'
 
 const hovered = ref('nenhuma')
+const selected = ref<RegionPointerEvent | null>(null)
 const config = reactive(structuredClone(defaultConfig))
 
-function onHover(region: Region | null) {
-  hovered.value = region?.name ?? 'nenhuma'
+function onHover(event: RegionPointerEvent | null) {
+  hovered.value = event?.region.name ?? 'nenhuma'
 }
+
+function onClick(event: RegionPointerEvent) {
+  selected.value = event
+}
+
 </script>
 
 <template>
   <main>
-    <Globe :config="config" @region-hover="onHover" @region-click="onHover" @pointer-miss="onHover(null)" />
+    <Globe :config="config" @region-hover="onHover" @region-click="onClick" @pointer-miss="selected = null" />
 
     <aside>
       <h1>vue-globe</h1>
       <p>{{ hovered }}</p>
+      <p v-if="selected" class="picked">
+        clique: {{ selected.region.name }}
+        <span>{{ selected.lat.toFixed(1) }}, {{ selected.lng.toFixed(1) }}</span>
+      </p>
 
       <label><input v-model="config.showLines" type="checkbox" /> Linhas</label>
       <label><input v-model="config.showGrid" type="checkbox" /> Grade</label>
@@ -98,6 +108,11 @@ h1 {
 aside p {
   margin: 0 0 12px;
   color: #8fb4d9;
+}
+
+.picked span {
+  display: block;
+  color: #d7e4f2;
 }
 
 label {
