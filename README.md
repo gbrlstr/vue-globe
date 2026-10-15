@@ -1,5 +1,7 @@
 # vue-globe
 
+![Globo girando, com países, grade e oceano](./globe.gif)
+
 Componente Vue 3 de um globo WebGL. O projeto que consome importa o componente, passa as regiões e decide o que fazer com hover e clique.
 
 ## Como usar
