@@ -1,9 +1,10 @@
 {
   "name": "vue-globe",
   "version": "0.0.1",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Globo WebGL para Vue 3, com regiões customizáveis.",
+  "license": "MIT",
   "author": {
     "name": "Gabriel Carlos Ferreira",
     "email": "gabriel.developed@gmail.com",

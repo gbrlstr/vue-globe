@@ -167,3 +167,7 @@ npm run dev
 ```
 
 `npm run build` gera `dist/` para publicar ou ligar com `file:../vue-globe`.
+
+## Licença
+
+MIT. Veja o arquivo [LICENSE](./LICENSE).
