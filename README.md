@@ -10,15 +10,8 @@ Componente Vue 3 de um globo WebGL. O projeto que consome importa o componente, 
 
 O projeto precisa de Vue 3.5 ou mais recente. `three` entra junto com o componente.
 
-Enquanto o pacote não está no npm, gere o build e ligue pela pasta:
-
 ```bash
-cd vue-globe
-npm install
-npm run build
-
-cd ../meu-projeto
-npm install three file:../vue-globe
+npm install vue-globe three
 ```
 
 ### 2. Importar o componente e o CSS

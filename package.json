@@ -1,6 +1,6 @@
 {
   "name": "vue-globe",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": false,
   "type": "module",
   "description": "Globo WebGL para Vue 3, com regiões customizáveis.",
@@ -21,7 +21,8 @@
   "module": "./dist/vue-globe.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "globe.gif"
   ],
   "scripts": {
     "dev": "vite",
