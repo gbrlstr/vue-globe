@@ -30,6 +30,8 @@ const emit = defineEmits<{
   regionHover: [event: RegionPointerEvent | null]
   regionClick: [event: RegionPointerEvent]
   pointerMiss: []
+  markerHover: [marker: GlobeMarker | null]
+  markerClick: [marker: GlobeMarker]
 }>()
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -70,6 +72,8 @@ onMounted(() => {
       onClick: (region) => emit('regionClick', region),
       onMiss: () => emit('pointerMiss'),
       onReady: () => emit('ready'),
+      onMarkerHover: (marker) => emit('markerHover', marker),
+      onMarkerClick: (marker) => emit('markerClick', marker),
     },
     props.assets,
   )

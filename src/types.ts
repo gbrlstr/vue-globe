@@ -34,6 +34,8 @@ export interface GlobeMarker {
   lat: number
   lng: number
   label?: string
+  /** Cor do pino. Sem ela, usa `config.colors.marker`. */
+  color?: string
   data?: unknown
 }
 
@@ -46,7 +48,12 @@ export interface GlobeColors {
   grid: string
   atmosphere: string
   background: string
+  marker: string
+  label: string
+  labelBackground: string
 }
+
+export type MarkerLabelMode = 'always' | 'hover' | 'never'
 
 export interface GlobeCamera {
   lat: number
@@ -64,6 +71,10 @@ export interface GlobeConfig {
   showAtmosphere: boolean
   showClouds: boolean
   showCells: boolean
+  showMarkers: boolean
+  /** Raio do pino. O globo tem raio 2. */
+  markerSize: number
+  markerLabels: MarkerLabelMode
   lineOpacity: number
   fillOpacity: number
   gridOpacity: number
@@ -98,6 +109,9 @@ export const defaultConfig: GlobeConfig = {
   showAtmosphere: true,
   showClouds: true,
   showCells: true,
+  showMarkers: true,
+  markerSize: 0.04,
+  markerLabels: 'always',
   lineOpacity: 0.55,
   fillOpacity: 0.55,
   gridOpacity: 0.5,
@@ -110,6 +124,9 @@ export const defaultConfig: GlobeConfig = {
     grid: '#cedff3',
     atmosphere: '#83a6ce',
     background: '#061018',
+    marker: '#ffd23f',
+    label: '#ffffff',
+    labelBackground: 'rgba(6, 16, 24, 0.78)',
   },
   camera: {
     lat: -18,

@@ -43,6 +43,7 @@ import {
 import { findRegion, GLOBE_RADIUS, latLngToSphere } from './geo'
 import { createFillSphereMaterial, createGlobeMaterial } from './globeShader.js'
 import { HeatMap } from './heatmap'
+import { MarkerLayer } from './markers'
 
 // No build (vite.config.ts), cada marcador vira `new URL("./assets/...", import.meta.url).href`
 // e o arquivo é copiado para dist/assets, em vez de ser embutido no JavaScript da biblioteca.
@@ -67,6 +68,8 @@ export interface GlobeViewHandlers {
   onClick: (event: RegionPointerEvent) => void
   onMiss: () => void
   onReady: () => void
+  onMarkerHover: (marker: GlobeMarker | null) => void
+  onMarkerClick: (marker: GlobeMarker) => void
 }
 
 export class GlobeView {
@@ -77,6 +80,7 @@ export class GlobeView {
   private readonly pointer = new Vector2(-2, -2)
   private readonly resizeObserver: ResizeObserver
   private readonly loader = new TextureLoader()
+  private readonly markerLayer: MarkerLayer
 
   private globe: Mesh | null = null
   private atmosphere: Mesh | null = null
@@ -109,6 +113,8 @@ export class GlobeView {
   private moved = false
   private pointerDown = { x: 0, y: 0 }
   private hoveredId: string | null = null
+  private hoveredMarkerId: string | null = null
+  private pinnedId: string | null = null
   private selectedId: string | null = null
   private disposed = false
   private loaded = false
@@ -135,6 +141,8 @@ export class GlobeView {
     this.camera = new PerspectiveCamera(defaultConfig.camera.fov, 1, 0.1, 100)
     this.lookAt(defaultConfig.camera.lat, defaultConfig.camera.lng)
     this.scene.add(this.countries, this.customLines)
+    this.markerLayer = new MarkerLayer(root)
+    this.scene.add(this.markerLayer.group)
 
     this.resize()
     this.resizeObserver = new ResizeObserver(() => this.resize())
@@ -169,7 +177,11 @@ export class GlobeView {
       this.lookAt((minLat + maxLat) / 2, (minLng + maxLng) / 2)
       return
     }
-    if (!region) return
+    if (!region) {
+      const marker = this.markerLayer.positionOf(id)
+      if (marker) this.lookAt(marker.lat, marker.lng)
+      return
+    }
     const ring = region.geometry.type === 'Polygon' ? region.geometry.coordinates[0] : region.geometry.coordinates[0]?.[0]
     if (!ring?.length) return
     const lng = ring.reduce((sum, point) => sum + point[0], 0) / ring.length
@@ -177,12 +189,15 @@ export class GlobeView {
     this.lookAt(lat, lng)
   }
 
+  // Destaque fixo: o hover do ponteiro pinta por cima, mas ao sair da região volta para ele.
   highlight(id: string | null) {
+    this.pinnedId = id
     this.setHover(id)
   }
 
   clear() {
     this.selectedId = null
+    this.pinnedId = null
     this.setHover(null)
     this.paintSelected(null)
   }
@@ -198,6 +213,8 @@ export class GlobeView {
     window.removeEventListener('pointerup', this.onPointerUp)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
     this.heat?.dispose()
+    this.scene.remove(this.markerLayer.group)
+    this.markerLayer.dispose()
     this.renderer.dispose()
   }
 
@@ -359,6 +376,7 @@ export class GlobeView {
     const { config } = this.options
     this.countries.visible = config.showLines
     this.customLines.visible = config.showLines
+    this.markerLayer.configure(this.options.markers, config)
 
     const border = new Color(config.colors.border)
     for (const [code, material] of this.materials) {
@@ -452,6 +470,8 @@ export class GlobeView {
       const mouse = this.shader.uniforms.uMouseUV?.value as Vector2 | undefined
       this.heat?.update(mouse && mouse.x >= 0 ? mouse : null)
     }
+
+    this.markerLayer.update(this.camera, this.root.clientWidth, this.root.clientHeight, now)
 
     this.renderer.render(this.scene, this.camera)
     this.raf = requestAnimationFrame(this.frame)
@@ -555,12 +575,31 @@ export class GlobeView {
     }
 
     const hit = this.pick()
-    const nextId = hit?.region.id ?? null
+    const nextId = hit?.region.id ?? this.pinnedId
     if (nextId !== this.hoveredId) {
       this.setHover(nextId)
       this.handlers.onHover(hit)
-      this.renderer.domElement.style.cursor = hit ? 'pointer' : 'grab'
     }
+
+    const marker = this.pickMarker()
+    this.setMarkerHover(marker)
+    this.renderer.domElement.style.cursor = hit || marker ? 'pointer' : 'grab'
+  }
+
+  // Marcador sob o ponteiro, se não estiver escondido atrás do globo.
+  private pickMarker() {
+    if (!this.options.config.interactive) return null
+    this.raycaster.setFromCamera(this.pointer, this.camera)
+    const globeHit = this.globe ? this.raycaster.intersectObject(this.globe, false)[0] : undefined
+    return this.markerLayer.pick(this.raycaster, globeHit ? globeHit.distance + 0.05 : Infinity)
+  }
+
+  private setMarkerHover(marker: GlobeMarker | null) {
+    const id = marker?.id ?? null
+    if (id === this.hoveredMarkerId) return
+    this.hoveredMarkerId = id
+    this.markerLayer.setHover(id)
+    this.handlers.onMarkerHover(marker)
   }
 
   private onPointerUp = (event: PointerEvent) => {
@@ -568,6 +607,11 @@ export class GlobeView {
     this.setPointer(event)
     this.dragging = false
     if (this.moved || !this.options.config.interactive) return
+    const marker = this.pickMarker()
+    if (marker) {
+      this.handlers.onMarkerClick(marker)
+      return
+    }
     const hit = this.pick()
     if (hit) {
       this.selectedId = hit.region.id
@@ -588,9 +632,11 @@ export class GlobeView {
   }
 
   private onPointerLeave = () => {
-    if (this.hoveredId && this.hoveredId !== this.selectedId) this.setHover(this.selectedId)
-    else if (!this.selectedId) this.setHover(null)
+    const rest = this.selectedId ?? this.pinnedId
+    if (this.hoveredId && this.hoveredId !== rest) this.setHover(rest)
+    else if (!this.selectedId) this.setHover(this.pinnedId)
     if (!this.selectedId) this.handlers.onHover(null)
+    this.setMarkerHover(null)
     this.renderer.domElement.style.cursor = 'grab'
     const mouse = this.shader?.uniforms.uMouseUV?.value as Vector2 | undefined
     mouse?.set(-1, -1)

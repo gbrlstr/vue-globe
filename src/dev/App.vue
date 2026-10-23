@@ -2,7 +2,7 @@
 import { reactive, ref } from 'vue'
 
 import Globe from '@/components/Globe.vue'
-import { defaultConfig, type GlobeAssets, type RegionPointerEvent } from '@/types'
+import { defaultConfig, type GlobeAssets, type GlobeMarker, type RegionPointerEvent } from '@/types'
 import colorMapUrl from '@/assets/textures/color_map.webp?url'
 import seaMapUrl from '@/assets/textures/sea_map.webp?url'
 import specularMapUrl from '@/assets/textures/specular_map.webp?url'
@@ -28,11 +28,42 @@ function onClick(event: RegionPointerEvent) {
   selected.value = event
 }
 
+const markers: GlobeMarker[] = [
+  { id: 'fortaleza', lat: -3.73, lng: -38.52, label: 'Fortaleza' },
+  { id: 'sao-paulo', lat: -23.55, lng: -46.63, label: 'São Paulo' },
+  { id: 'lisboa', lat: 38.72, lng: -9.14, label: 'Lisboa' },
+  { id: 'nova-york', lat: 40.71, lng: -74.0, label: 'Nova York', color: '#4ade80' },
+  { id: 'cidade-do-cabo', lat: -33.92, lng: 18.42, label: 'Cidade do Cabo' },
+  { id: 'toquio', lat: 35.68, lng: 139.69, label: 'Tóquio' },
+  { id: 'sydney', lat: -33.87, lng: 151.21, label: 'Sydney' },
+]
+const globe = ref<InstanceType<typeof Globe> | null>(null)
+const markerHovered = ref('nenhum')
+const markerClicked = ref<GlobeMarker | null>(null)
+
+function onMarkerHover(marker: GlobeMarker | null) {
+  markerHovered.value = marker?.label ?? 'nenhum'
+}
+
+function onMarkerClick(marker: GlobeMarker) {
+  markerClicked.value = marker
+}
+
 </script>
 
 <template>
   <main>
-    <Globe :config="config" :assets="assets" @region-hover="onHover" @region-click="onClick" @pointer-miss="selected = null" />
+    <Globe
+      ref="globe"
+      :config="config"
+      :assets="assets"
+      :markers="markers"
+      @region-hover="onHover"
+      @region-click="onClick"
+      @pointer-miss="selected = null"
+      @marker-hover="onMarkerHover"
+      @marker-click="onMarkerClick"
+    />
 
     <aside>
       <h1>vue-globe</h1>
@@ -41,6 +72,14 @@ function onClick(event: RegionPointerEvent) {
         clique: {{ selected.region.name }}
         <span>{{ selected.lat.toFixed(1) }}, {{ selected.lng.toFixed(1) }}</span>
       </p>
+      <p>marcador: {{ markerHovered }}</p>
+      <p v-if="markerClicked" class="picked">clique no marcador: {{ markerClicked.label }}</p>
+
+      <div class="actions">
+        <button type="button" @click="globe?.focus('toquio')">Ir para Tóquio</button>
+        <button type="button" @click="globe?.highlight('JPN')">Destacar Japão</button>
+        <button type="button" @click="globe?.clear()">Limpar</button>
+      </div>
 
       <label><input v-model="config.showLines" type="checkbox" /> Linhas</label>
       <label><input v-model="config.showGrid" type="checkbox" /> Grade</label>
@@ -49,6 +88,19 @@ function onClick(event: RegionPointerEvent) {
       <label><input v-model="config.showCells" type="checkbox" /> Células</label>
       <label><input v-model="config.autoRotate" type="checkbox" /> Rotação</label>
       <label><input v-model="config.interactive" type="checkbox" /> Interação</label>
+      <label><input v-model="config.showMarkers" type="checkbox" /> Marcadores</label>
+      <label>
+        Rótulos
+        <select v-model="config.markerLabels">
+          <option value="always">sempre</option>
+          <option value="hover">no hover</option>
+          <option value="never">nunca</option>
+        </select>
+      </label>
+      <label class="range">
+        Tamanho dos marcadores
+        <input v-model.number="config.markerSize" type="range" min="0.02" max="0.12" step="0.005" />
+      </label>
 
       <label class="range">
         Velocidade
@@ -72,6 +124,7 @@ function onClick(event: RegionPointerEvent) {
         <label>Grade <input v-model="config.colors.grid" type="color" /></label>
         <label>Atmosfera <input v-model="config.colors.atmosphere" type="color" /></label>
         <label>Fundo <input v-model="config.colors.background" type="color" /></label>
+        <label>Marcador <input v-model="config.colors.marker" type="color" /></label>
       </div>
     </aside>
   </main>
@@ -138,6 +191,22 @@ label {
 .range {
   display: block;
   margin-top: 12px;
+}
+
+.actions {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.actions button {
+  padding: 6px 8px;
+  border: 1px solid rgba(206, 223, 243, 0.25);
+  border-radius: 8px;
+  background: rgba(206, 223, 243, 0.08);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 .range input,

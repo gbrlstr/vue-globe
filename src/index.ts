@@ -10,6 +10,7 @@ export type {
   GlobeConfig,
   GlobeMarker,
   GlobeTextureUrls,
+  MarkerLabelMode,
   MultiPolygonGeometry,
   PolygonGeometry,
   Position,
