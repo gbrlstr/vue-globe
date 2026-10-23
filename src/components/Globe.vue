@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { GlobeView } from '@/engine/view'
 import {
   resolveConfig,
+  type GlobeArc,
   type GlobeAssets,
   type GlobeConfig,
   type GlobeMarker,
@@ -15,12 +16,14 @@ const props = withDefaults(
   defineProps<{
     regions?: Region[]
     markers?: GlobeMarker[]
+    arcs?: GlobeArc[]
     config?: Partial<GlobeConfig>
     assets?: GlobeAssets
   }>(),
   {
     regions: () => [],
     markers: () => [],
+    arcs: () => [],
     config: () => ({}),
   },
 )
@@ -44,6 +47,7 @@ function sync() {
   view?.setOptions({
     regions: props.regions,
     markers: props.markers,
+    arcs: props.arcs,
     config: resolved.value,
   })
 }
@@ -97,6 +101,11 @@ watch(
 )
 watch(
   () => props.markers,
+  () => sync(),
+  { deep: true },
+)
+watch(
+  () => props.arcs,
   () => sync(),
   { deep: true },
 )

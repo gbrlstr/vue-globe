@@ -1,3 +1,4 @@
+import { countryName } from './countries'
 import {
   ACESFilmicToneMapping,
   AdditiveBlending,
@@ -21,6 +22,7 @@ import {
 
 import {
   defaultConfig,
+  type GlobeArc,
   type GlobeAssets,
   type GlobeConfig,
   type GlobeMarker,
@@ -40,6 +42,7 @@ import {
   type CountryLines,
   type IndexedFeature,
 } from './borders'
+import { ArcLayer } from './arcs'
 import { findRegion, GLOBE_RADIUS, latLngToSphere } from './geo'
 import { createFillSphereMaterial, createGlobeMaterial } from './globeShader.js'
 import { HeatMap } from './heatmap'
@@ -60,6 +63,7 @@ const defaultTextureUrls: GlobeTextureUrls = {
 export interface GlobeViewOptions {
   regions: Region[]
   markers: GlobeMarker[]
+  arcs: GlobeArc[]
   config: GlobeConfig
 }
 
@@ -81,6 +85,7 @@ export class GlobeView {
   private readonly resizeObserver: ResizeObserver
   private readonly loader = new TextureLoader()
   private readonly markerLayer: MarkerLayer
+  private readonly arcLayer: ArcLayer
 
   private globe: Mesh | null = null
   private atmosphere: Mesh | null = null
@@ -94,6 +99,10 @@ export class GlobeView {
   private selectedCtx: CanvasRenderingContext2D | null = null
   private selectedTexture: CanvasTexture | null = null
   private selectedMat: ShaderMaterial | null = null
+  private regionFillCtx: CanvasRenderingContext2D | null = null
+  private regionFillTexture: CanvasTexture | null = null
+  private regionFillMat: ShaderMaterial | null = null
+  private regionFillPainted = false
   private materials = new Map<string, LineBasicMaterial>()
   private features: IndexedFeature[] = []
   private raw = new Map<string, { type: 'Polygon' | 'MultiPolygon'; coordinates: number[][][] | number[][][][] }>()
@@ -102,6 +111,7 @@ export class GlobeView {
   private options: GlobeViewOptions = {
     regions: [],
     markers: [],
+    arcs: [],
     config: defaultConfig,
   }
 
@@ -142,7 +152,8 @@ export class GlobeView {
     this.lookAt(defaultConfig.camera.lat, defaultConfig.camera.lng)
     this.scene.add(this.countries, this.customLines)
     this.markerLayer = new MarkerLayer(root)
-    this.scene.add(this.markerLayer.group)
+    this.arcLayer = new ArcLayer()
+    this.scene.add(this.markerLayer.group, this.arcLayer.group)
 
     this.resize()
     this.resizeObserver = new ResizeObserver(() => this.resize())
@@ -213,8 +224,9 @@ export class GlobeView {
     window.removeEventListener('pointerup', this.onPointerUp)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
     this.heat?.dispose()
-    this.scene.remove(this.markerLayer.group)
+    this.scene.remove(this.markerLayer.group, this.arcLayer.group)
     this.markerLayer.dispose()
+    this.arcLayer.dispose()
     this.renderer.dispose()
   }
 
@@ -306,15 +318,20 @@ export class GlobeView {
 
   private createFillLayers() {
     const geometry = buildSphere(GLOBE_RADIUS * 1.005, 64, 64)
+    // Preenchimento das regiões (cor de cada `Region.fill`), por baixo do hover e da seleção.
+    const regionFill = this.makeFillLayer(geometry, 1, '#ffffff')
     const hover = this.makeFillLayer(geometry, 2, this.options.config.colors.hover)
     const selected = this.makeFillLayer(geometry, 3, this.options.config.colors.fill)
+    this.regionFillCtx = regionFill.ctx
+    this.regionFillTexture = regionFill.texture
+    this.regionFillMat = regionFill.material
     this.hoverCtx = hover.ctx
     this.hoverTexture = hover.texture
     this.hoverMat = hover.material
     this.selectedCtx = selected.ctx
     this.selectedTexture = selected.texture
     this.selectedMat = selected.material
-    this.scene.add(hover.mesh, selected.mesh)
+    this.scene.add(regionFill.mesh, hover.mesh, selected.mesh)
   }
 
   private makeFillLayer(geometry: BufferGeometry, order: number, color: string) {
@@ -353,8 +370,12 @@ export class GlobeView {
   private rebuildCustomLines() {
     for (const child of [...this.customLines.children]) {
       this.customLines.remove(child)
-      if (child instanceof Line) child.geometry.dispose()
+      if (child instanceof Line) {
+        child.geometry.dispose()
+        if (child.material instanceof LineBasicMaterial) child.material.dispose()
+      }
     }
+    this.paintRegionFills()
     for (const region of this.options.regions) {
       const polygons = region.geometry.type === 'Polygon' ? [region.geometry.coordinates] : region.geometry.coordinates
       const material = new LineBasicMaterial({
@@ -372,11 +393,37 @@ export class GlobeView {
     }
   }
 
+  // Pinta, em uma textura sobre a esfera, a cor de cada região que tem `fill`. A última da lista fica por cima.
+  private paintRegionFills() {
+    if (!this.regionFillCtx || !this.regionFillTexture) return
+    this.regionFillCtx.clearRect(0, 0, FILL_TEX_W, FILL_TEX_H)
+    this.regionFillPainted = false
+    for (const region of this.options.regions) {
+      if (!region.fill) continue
+      paintGeometry(
+        this.regionFillCtx,
+        { type: region.geometry.type, coordinates: region.geometry.coordinates },
+        false,
+        region.fill,
+      )
+      this.regionFillPainted = true
+    }
+    this.regionFillTexture.needsUpdate = true
+    this.applyRegionFillOpacity()
+  }
+
+  private applyRegionFillOpacity() {
+    const opacity = this.regionFillMat?.uniforms.uOpacity
+    if (opacity) opacity.value = this.regionFillPainted ? this.options.config.regionOpacity : 0
+  }
+
   private applyAppearance() {
     const { config } = this.options
     this.countries.visible = config.showLines
     this.customLines.visible = config.showLines
     this.markerLayer.configure(this.options.markers, config)
+    this.arcLayer.configure(this.options.arcs, config)
+    this.applyRegionFillOpacity()
 
     const border = new Color(config.colors.border)
     for (const [code, material] of this.materials) {
@@ -472,6 +519,7 @@ export class GlobeView {
     }
 
     this.markerLayer.update(this.camera, this.root.clientWidth, this.root.clientHeight, now)
+    this.arcLayer.update(now)
 
     this.renderer.render(this.scene, this.camera)
     this.raf = requestAnimationFrame(this.frame)
@@ -503,7 +551,7 @@ export class GlobeView {
   private toRegion(feature: IndexedFeature): Region {
     return {
       id: feature.code,
-      name: feature.name,
+      name: feature.name && feature.name !== feature.code ? feature.name : countryName(feature.code, this.options.config.locale),
       geometry: {
         type: feature.type,
         coordinates: feature.coordinates,
@@ -527,7 +575,8 @@ export class GlobeView {
   private paintHover(id: string | null) {
     if (!this.hoverCtx || !this.hoverTexture || !this.hoverMat) return
     this.hoverCtx.clearRect(0, 0, FILL_TEX_W, FILL_TEX_H)
-    const geometry = id ? this.raw.get(id) : null
+    // geometryFor inclui as regiões do usuário, então o hover e o destaque também funcionam nelas.
+    const geometry = id ? this.geometryFor(id) : null
     if (geometry) paintGeometry(this.hoverCtx, geometry, false)
     this.hoverTexture.needsUpdate = true
     const opacity = this.hoverMat.uniforms.uOpacity

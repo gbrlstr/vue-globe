@@ -17,6 +17,7 @@ export interface Region {
   name: string
   parentId?: string
   geometry: RegionGeometry
+  /** Cor de preenchimento da região (qualquer cor CSS). Sem ela, a região só tem borda. */
   fill?: string
   border?: string
   locked?: boolean
@@ -39,6 +40,20 @@ export interface GlobeMarker {
   data?: unknown
 }
 
+export interface LatLng {
+  lat: number
+  lng: number
+}
+
+export interface GlobeArc {
+  id: string
+  from: LatLng
+  to: LatLng
+  /** Uma cor, ou `[cor do início, cor do fim]` para um degradê. Sem ela, usa `config.colors.arc`. */
+  color?: string | [string, string]
+  data?: unknown
+}
+
 export interface GlobeColors {
   border: string
   fill: string
@@ -51,6 +66,7 @@ export interface GlobeColors {
   marker: string
   label: string
   labelBackground: string
+  arc: string
 }
 
 export type MarkerLabelMode = 'always' | 'hover' | 'never'
@@ -66,6 +82,8 @@ export interface GlobeConfig {
   autoRotate: boolean
   rotateSpeed: number
   interactive: boolean
+  /** Idioma dos nomes de país (código BCP 47, como `pt-BR`). Só vale para países sem nome no mapa. */
+  locale: string
   showLines: boolean
   showGrid: boolean
   showAtmosphere: boolean
@@ -75,6 +93,15 @@ export interface GlobeConfig {
   /** Raio do pino. O globo tem raio 2. */
   markerSize: number
   markerLabels: MarkerLabelMode
+  showArcs: boolean
+  /** Raio do tubo do arco. O globo tem raio 2. */
+  arcWidth: number
+  /** Parte de cada ciclo que fica acesa, de 0 a 1. Com 1 o arco é uma linha contínua. */
+  arcDash: number
+  /** Ciclos de traço por segundo. Com 0 o arco fica parado. */
+  arcSpeed: number
+  /** Opacidade do preenchimento das regiões com `fill`. */
+  regionOpacity: number
   lineOpacity: number
   fillOpacity: number
   gridOpacity: number
@@ -104,6 +131,7 @@ export const defaultConfig: GlobeConfig = {
   autoRotate: true,
   rotateSpeed: 0.12,
   interactive: true,
+  locale: 'en',
   showLines: true,
   showGrid: true,
   showAtmosphere: true,
@@ -112,6 +140,11 @@ export const defaultConfig: GlobeConfig = {
   showMarkers: true,
   markerSize: 0.04,
   markerLabels: 'always',
+  showArcs: true,
+  arcWidth: 0.008,
+  arcDash: 0.45,
+  arcSpeed: 0.6,
+  regionOpacity: 0.85,
   lineOpacity: 0.55,
   fillOpacity: 0.55,
   gridOpacity: 0.5,
@@ -127,6 +160,7 @@ export const defaultConfig: GlobeConfig = {
     marker: '#ffd23f',
     label: '#ffffff',
     labelBackground: 'rgba(6, 16, 24, 0.78)',
+    arc: '#ff8a3d',
   },
   camera: {
     lat: -18,

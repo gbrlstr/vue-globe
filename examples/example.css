@@ -1,0 +1,26 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #061018; color: #e8f0f8;
+  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+#app { position: fixed; inset: 0; }
+.panel { position: absolute; top: 16px; left: 16px; width: min(320px, calc(100% - 32px)); padding: 14px 16px;
+  background: rgba(6, 16, 24, 0.78); border: 1px solid rgba(131, 166, 206, 0.28); border-radius: 12px;
+  backdrop-filter: blur(8px); }
+.panel h1 { margin: 0 0 2px; font-size: 16px; font-weight: 650; }
+.panel p { margin: 0 0 10px; color: #9db4cc; font-size: 12.5px; }
+.panel .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.panel .stat { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(131, 166, 206, 0.2); min-height: 44px; }
+.panel .stat b { display: block; font-size: 15px; }
+.panel .stat span { color: #9db4cc; font-size: 12.5px; }
+button, select { font: inherit; color: inherit; background: rgba(131, 166, 206, 0.14); border: 1px solid rgba(131, 166, 206, 0.32);
+  border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+button:hover, select:hover { background: rgba(131, 166, 206, 0.26); }
+button.on { background: #e1251b; border-color: #e1251b; color: #fff; }
+select option { color: #000; }
+label.range { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #9db4cc; font-size: 12.5px; }
+label.range input { flex: 1; }
+.legend { position: absolute; left: 16px; bottom: 16px; width: min(320px, calc(100% - 32px)); padding: 10px 14px;
+  background: rgba(6, 16, 24, 0.78); border: 1px solid rgba(131, 166, 206, 0.28); border-radius: 12px; font-size: 12px; color: #9db4cc; }
+.legend .bar { height: 10px; border-radius: 5px; margin: 6px 0 4px; }
+.legend .ticks { display: flex; justify-content: space-between; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.credit { position: absolute; right: 14px; bottom: 10px; font-size: 11px; color: #5f7790; }

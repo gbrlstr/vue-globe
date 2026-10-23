@@ -1,252 +1,237 @@
 # vue-globe
 
-![Globo girando, com países, grade e oceano](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/globe.gif)
+**An interactive WebGL globe for Vue 3.** Countries you can hover and click, markers, animated arcs, choropleth fills and full theming, in about 16 KB of gzipped JavaScript (three.js is a peer dependency).
 
-Componente Vue 3 de um globo WebGL. O projeto que consome importa o componente, passa as regiões e decide o que fazer com hover e clique.
+🇧🇷 [Leia em português](./README.pt-BR.md)
 
-## Como usar
+![A spinning globe with countries, grid and ocean](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/globe.gif)
 
-### 1. Instalar
+## Examples
 
-O projeto precisa de Vue 3.5 ou mais recente. `three` entra junto com o componente.
+Every example is a single HTML file with a rendered preview. See [`examples/`](./examples) to run them.
+
+| | |
+| --- | --- |
+| [![Country explorer](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-explorador-de-paises/preview.png)](./examples/01-explorador-de-paises) **Country explorer**<br>Hover, click, focus and localized country names. | [![Brazil heat map](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-mapa-de-calor-brasil/preview.png)](./examples/02-mapa-de-calor-brasil) **Choropleth map**<br>One `Region` per Brazilian state, colored by density or macro-region. |
+| [![Flight routes](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-rotas-aereas/preview.png)](./examples/03-rotas-aereas) **Flight routes**<br>Animated gradient arcs between airports. | [![Cities with markers](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-cidades-com-marcadores/preview.png)](./examples/04-cidades-com-marcadores) **Markers**<br>Pins, labels, click events and camera flights. |
+| [![Themes](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-temas/preview.png)](./examples/05-temas) **Themes**<br>Neon, forest and paper looks from `config.colors`. | |
+
+## Features
+
+- Countries (and Brazilian and US states) drawn from a bundled map, with hover, click and persistent highlight
+- Your own regions as GeoJSON polygons, with an optional `fill` color for choropleth maps
+- Markers with labels, colors and hover/click events
+- Animated arcs with gradients, set by two coordinates
+- Camera control from code: `focus`, `highlight`, `clear`
+- Country names in any language through `Intl.DisplayNames` (`config.locale`)
+- Every color, opacity and layer is configurable at runtime
+- Heavy files (map and textures, about 3.3 MB) are separate assets, not inlined in the JavaScript, and can be served from a CDN
+- Written in TypeScript, types included
+
+## Install
+
+Requires Vue 3.5+ and three.js 0.184+.
 
 ```bash
 npm install vue-globe three
 ```
 
-### 2. Importar o componente e o CSS
+## Quick start
 
 ```vue
 <script setup>
 import { Globe } from 'vue-globe'
-import 'vue-globe/style.css'
+import 'vue-globe/style.css' // required: it makes the canvas fill its parent
 </script>
-```
 
-O CSS é obrigatório. Sem ele o canvas não ocupa o elemento pai.
-
-### 3. Dar largura e altura ao pai
-
-O globo preenche o elemento em que está. Esse elemento precisa de tamanho.
-
-```css
-.mapa {
-  width: 100%;
-  height: 100dvh;
-}
-```
-
-### 4. Colocar o globo na página
-
-Países e estados já vêm no componente. `config` é opcional: passe só o que quiser mudar.
-
-```vue
 <template>
-  <div class="mapa">
-    <Globe :config="config" @region-click="onClick" />
+  <!-- the parent needs a size -->
+  <div style="width: 100%; height: 100dvh">
+    <Globe @region-click="({ region }) => console.log(region.name)" />
   </div>
 </template>
-
-<script setup>
-import { Globe } from 'vue-globe'
-import 'vue-globe/style.css'
-
-const config = {
-  autoRotate: true,
-  colors: {
-    border: '#005696',
-    fill: '#e1251b',
-    ocean: '#214898',
-  },
-  camera: { lat: -18, lng: -58, distance: 5.35 },
-}
-</script>
 ```
 
-### 5. Tratar o clique
-
-O globo marca a região e entrega o evento. Navegação, painel ou qualquer outra ação ficam no seu projeto.
+### Markers and arcs
 
 ```vue
 <script setup>
-function onClick({ region, lat, lng }) {
-  // region.id, region.name e region.data
-  // lat e lng do ponto clicado
-  console.log(region.name, lat, lng)
-}
+const markers = [
+  { id: 'fortaleza', lat: -3.73, lng: -38.52, label: 'Fortaleza' },
+  { id: 'lisboa', lat: 38.72, lng: -9.14, label: 'Lisbon', color: '#4ade80' },
+]
+const arcs = [
+  { id: 'for-lis', from: markers[0], to: markers[1], color: ['#ff8a3d', '#ffd23f'] },
+]
 </script>
 
 <template>
-  <Globe @region-click="onClick" />
+  <Globe :markers="markers" :arcs="arcs" @marker-click="(m) => console.log(m.id)" />
 </template>
 ```
 
-`@region-hover` recebe o mesmo objeto, ou `null` quando o ponteiro sai da região. `@pointer-miss` dispara ao clicar no oceano, fora de qualquer região.
+### Choropleth regions
 
-```vue
-<Globe
-  @region-hover="onHover"
-  @region-click="onClick"
-  @pointer-miss="onMiss"
-/>
-```
-
-### 6. Adicionar regiões próprias
-
-`:regions` desenha polígonos extras por cima dos países. O clique testa essas regiões primeiro. As coordenadas seguem GeoJSON: `[longitude, latitude]`.
-
-`data` volta no evento do clique, para você guardar o que o seu app precisa.
+A `Region` with a `fill` color is painted on the globe. Coordinates follow GeoJSON (`[longitude, latitude]`).
 
 ```vue
 <script setup>
 const regions = [
   {
     id: 'area-1',
-    name: 'Área customizada',
+    name: 'My area',
     fill: '#e1251b',
-    data: { rota: '/area-1' },
+    data: { route: '/area-1' }, // comes back in the events
     geometry: {
       type: 'Polygon',
-      coordinates: [
-        [
-          [-48.5, -1.4],
-          [-48.3, -1.4],
-          [-48.3, -1.2],
-          [-48.5, -1.2],
-          [-48.5, -1.4],
-        ],
-      ],
+      coordinates: [[[-48.5, -1.4], [-48.3, -1.4], [-48.3, -1.2], [-48.5, -1.2], [-48.5, -1.4]]],
     },
   },
 ]
-
-function onClick({ region }) {
-  console.log(region.data)
-}
 </script>
 
 <template>
-  <Globe :regions="regions" @region-click="onClick" />
+  <Globe :regions="regions" :config="{ regionOpacity: 0.85 }" />
 </template>
 ```
 
-### 7. Marcadores
+See the [Brazil heat map example](./examples/02-mapa-de-calor-brasil) for a full one: it builds 27 regions from the bundled map and colors them by population density.
 
-`:markers` coloca pinos no globo. Cada marcador precisa de `id`, `lat` e `lng`. `label` mostra um rótulo, `color` troca a cor do pino e `data` volta nos eventos.
-
-```vue
-<script setup>
-const markers = [
-  { id: 'fortaleza', lat: -3.73, lng: -38.52, label: 'Fortaleza', data: { rota: '/fortaleza' } },
-  { id: 'lisboa', lat: 38.72, lng: -9.14, label: 'Lisboa', color: '#4ade80' },
-]
-
-function onMarkerClick(marker) {
-  console.log(marker.id, marker.data)
-}
-
-function onMarkerHover(marker) {
-  // marker, ou null quando o ponteiro sai do pino
-}
-</script>
-
-<template>
-  <Globe :markers="markers" @marker-click="onMarkerClick" @marker-hover="onMarkerHover" />
-</template>
-```
-
-- Clicar em um pino dispara só `@marker-click`, não `@region-click`.
-- Pinos do outro lado do globo somem junto com o rótulo e não recebem clique.
-- Se dois marcadores tiverem o mesmo `id`, vale o primeiro.
-- O rótulo é sempre texto puro, nunca HTML.
-- `markerLabels` controla os rótulos: `'always'` (padrão), `'hover'` ou `'never'`.
-- Pensado para dezenas de pontos. Milhares ainda não foram otimizados.
-
-### 8. Controlar o globo por código
-
-Pegue o componente com `ref` e chame os métodos:
+### Controlling the globe from code
 
 ```vue
 <script setup>
 import { ref } from 'vue'
-
 const globe = ref(null)
 </script>
 
 <template>
   <Globe ref="globe" :markers="markers" />
-  <button @click="globe.focus('fortaleza')">Ir para Fortaleza</button>
-  <button @click="globe.highlight('JPN')">Destacar o Japão</button>
-  <button @click="globe.clear()">Limpar</button>
+  <button @click="globe.focus('fortaleza')">Go to Fortaleza</button>
+  <button @click="globe.highlight('JPN')">Highlight Japan</button>
+  <button @click="globe.clear()">Clear</button>
 </template>
 ```
 
-| Método | O que faz |
-| --- | --- |
-| `focus(id)` | Gira a câmera para um país (código de 3 letras, como `JPN`), uma região sua (`id` de `:regions`) ou um marcador (`id` de `:markers`) |
-| `highlight(id)` | Destaca um país pelo código de 3 letras. O destaque fica fixo, e passar o ponteiro por outras regiões não o apaga. `highlight(null)` remove |
-| `clear()` | Remove a seleção e o destaque |
+## API
 
-O Brasil e os EUA são desenhados estado por estado no mapa embutido, então `focus('BRA')` e `focus('USA')` não centralizam o país inteiro. Para isso, use o `id` de um marcador ou de uma região sua.
+### Props
 
-## O que dá para configurar
-
-| Campo | Padrão | Efeito |
+| Prop | Type | Description |
 | --- | --- | --- |
-| `autoRotate` | `true` | Gira a câmera sozinha |
-| `rotateSpeed` | `0.12` | Velocidade da rotação, em radianos por segundo |
-| `interactive` | `true` | Arrastar, hover e clique |
-| `showLines` | `true` | Bordas dos países |
-| `showGrid` | `true` | Grade sobre o oceano |
-| `showAtmosphere` | `true` | Halo em volta do globo |
-| `showClouds` | `true` | Nuvens no oceano |
-| `showCells` | `true` | Células de hover |
-| `showMarkers` | `true` | Mostra os marcadores de `:markers` |
-| `markerSize` | `0.04` | Raio do pino (o globo tem raio 2) |
-| `markerLabels` | `'always'` | Rótulos dos marcadores: `'always'`, `'hover'` ou `'never'` |
-| `lineOpacity` | `0.55` | Opacidade das bordas |
-| `fillOpacity` | `0.55` | Opacidade do preenchimento |
-| `gridOpacity` | `0.5` | Opacidade da grade |
-| `colors` | ver abaixo | Cores do globo |
-| `camera` | ver abaixo | Posição inicial da câmera |
+| `regions` | `Region[]` | Extra polygons drawn over the countries. Tested for hover and click before the built-in map. |
+| `markers` | `GlobeMarker[]` | Pins on the globe. |
+| `arcs` | `GlobeArc[]` | Animated arcs between two coordinates. |
+| `config` | `Partial<GlobeConfig>` | Anything you want to change from the defaults. Reactive. |
+| `assets` | `GlobeAssets` | Custom URLs for the map and textures. Read once, on mount. |
 
-Cores: `border` `#005696`, `fill` `#e1251b`, `hover` `#ffffff`, `land` `#fefefe`, `ocean` `#214898`, `grid` `#cedff3`, `atmosphere` `#83a6ce`, `background` `#061018`, `marker` `#ffd23f`, `label` `#ffffff`, `labelBackground` `rgba(6, 16, 24, 0.78)`.
+### Events
 
-Câmera: `lat` `-18`, `lng` `-58`, `distance` `5.35`, `fov` `40`.
+| Event | Payload | When |
+| --- | --- | --- |
+| `ready` | none | Map and textures finished loading. |
+| `regionHover` | `{ region, lat, lng }` or `null` | The pointer enters or leaves a region. |
+| `regionClick` | `{ region, lat, lng }` | A region is clicked. |
+| `pointerMiss` | none | A click lands on the ocean. |
+| `markerHover` | `GlobeMarker` or `null` | The pointer enters or leaves a pin. |
+| `markerClick` | `GlobeMarker` | A pin is clicked. It does not also fire `regionClick`. |
 
-## Mapa e texturas
+### Methods (via `ref`)
 
-O mapa dos países e as texturas do globo (cerca de 3,3 MB no total) não ficam dentro do JavaScript da biblioteca. Eles vêm como arquivos em `dist/assets`, e o bundler do seu projeto (Vite, webpack) copia esses arquivos para a build e resolve as URLs sozinho. Não precisa configurar nada.
+| Method | What it does |
+| --- | --- |
+| `focus(id)` | Flies the camera to a country (3-letter code such as `JPN`), one of your regions or a marker. |
+| `highlight(id)` | Highlights a country by its 3-letter code. The highlight stays until `highlight(null)` or `clear()`. |
+| `clear()` | Removes the selection and the highlight. |
 
-Para servir esses arquivos de outro lugar, como um CDN, passe `assets`. Tudo é opcional: o que você não informar usa o arquivo do pacote. O valor é lido uma vez, quando o componente monta.
+Brazil and the US are drawn state by state in the bundled map, so `focus('BRA')` does not center the whole country. Use a marker or a region of your own for that.
+
+### Types
+
+```ts
+interface Region {
+  id: string
+  name: string
+  geometry: PolygonGeometry | MultiPolygonGeometry // GeoJSON, [lng, lat]
+  fill?: string // any CSS color. Without it the region only has a border
+  border?: string
+  locked?: boolean
+  data?: unknown
+}
+
+interface GlobeMarker { id: string; lat: number; lng: number; label?: string; color?: string; data?: unknown }
+
+interface GlobeArc {
+  id: string
+  from: { lat: number; lng: number }
+  to: { lat: number; lng: number }
+  color?: string | [string, string] // one color, or [start, end] for a gradient
+  data?: unknown
+}
+```
+
+### Config
+
+| Field | Default | Effect |
+| --- | --- | --- |
+| `autoRotate` | `true` | Spins the camera by itself |
+| `rotateSpeed` | `0.12` | Rotation speed, in radians per second |
+| `interactive` | `true` | Drag, hover and click |
+| `locale` | `'en'` | Language of country names (BCP 47, such as `pt-BR`). Only used for countries without a name in the map |
+| `showLines` | `true` | Country borders |
+| `showGrid` | `true` | Grid over the ocean |
+| `showAtmosphere` | `true` | Halo around the globe |
+| `showClouds` | `true` | Clouds over the ocean |
+| `showCells` | `true` | Hover cells |
+| `showMarkers` | `true` | Shows `markers` |
+| `markerSize` | `0.04` | Pin radius (the globe has radius 2) |
+| `markerLabels` | `'always'` | `'always'`, `'hover'` or `'never'` |
+| `showArcs` | `true` | Shows `arcs` |
+| `arcWidth` | `0.008` | Arc tube radius |
+| `arcDash` | `0.45` | Lit part of each dash cycle, from 0 to 1. With `1` the arc is a solid line |
+| `arcSpeed` | `0.6` | Dash cycles per second. With `0` the arc stays still |
+| `regionOpacity` | `0.85` | Opacity of regions that have `fill` |
+| `lineOpacity` | `0.55` | Border opacity |
+| `fillOpacity` | `0.55` | Hover and selection fill opacity |
+| `gridOpacity` | `0.5` | Grid opacity |
+| `colors` | see below | Globe colors |
+| `camera` | see below | Initial camera |
+
+Colors: `border` `#005696`, `fill` `#e1251b`, `hover` `#ffffff`, `land` `#fefefe`, `ocean` `#214898`, `grid` `#cedff3`, `atmosphere` `#83a6ce`, `background` `#061018`, `marker` `#ffd23f`, `label` `#ffffff`, `labelBackground` `rgba(6, 16, 24, 0.78)`, `arc` `#ff8a3d`.
+
+Camera: `lat` `-18`, `lng` `-58`, `distance` `5.35`, `fov` `40`.
+
+## Map and textures
+
+The country map and the textures (about 3.3 MB together) are not inlined in the library's JavaScript. They ship as files in `dist/assets`, and your bundler (Vite, webpack) copies them and resolves the URLs by itself.
+
+To serve them from somewhere else, such as a CDN, pass `assets`. Every field is optional, and whatever you leave out uses the file from the package.
 
 ```vue
-<script setup>
-const assets = {
-  world: 'https://cdn.exemplo.com/globe/world-main.json',
-  textures: {
-    color: 'https://cdn.exemplo.com/globe/color_map.webp',
-    // sea, specular, bump e normal seguem o mesmo padrão
-  },
-}
-</script>
-
-<template>
-  <Globe :assets="assets" />
-</template>
+<Globe
+  :assets="{
+    world: 'https://cdn.example.com/globe/world-main.json',
+    textures: { color: 'https://cdn.example.com/globe/color_map.webp' }, // sea, specular, bump, normal work the same way
+  }"
+/>
 ```
 
-## Desenvolvimento
+## Notes
+
+- **Server rendering.** The WebGL scene is created in `onMounted`, so on the server only an empty container is rendered. In Nuxt, wrapping the component in `<ClientOnly>` is the safe choice. This has not been tested in a Nuxt project yet.
+- **Scale.** Markers and arcs are meant for dozens of items. Thousands are not optimized yet.
+- **Brazil state ids.** In the bundled map, `region.id` for a Brazilian or US state is the country code (`BRA`, `USA`), and the state is in `region.name`. For per-state control, build your own regions as in the heat map example.
+- **Map data.** The bundled map is a compacted version of a public world dataset. Check its license before using it commercially.
+
+## Development
 
 ```bash
 npm install
-npm run dev
+npm run dev        # playground in src/dev
+npm run build      # outputs dist/, including dist/assets
+npm run examples   # builds, then serves the repo so you can open examples/
 ```
 
-`npm run build` gera `dist/` (incluindo `dist/assets`) para publicar ou ligar com `file:../vue-globe`.
+## License
 
-No `npm run dev`, o app de teste em `src/dev` informa os arquivos de `src/assets` pela prop `assets`. O componente sozinho só encontra os arquivos padrão depois do build.
-
-## Licença
-
-MIT. Veja o arquivo [LICENSE](./LICENSE).
+MIT. See [LICENSE](./LICENSE).

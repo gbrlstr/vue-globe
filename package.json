@@ -48,7 +48,8 @@
     "dev": "vite",
     "build": "vue-tsc --build && vite build",
     "type-check": "vue-tsc --build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "examples": "npm run build && npx --yes serve ."
   },
   "peerDependencies": {
     "three": "^0.184.0",
