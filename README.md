@@ -8,13 +8,35 @@
 
 ## Examples
 
-Every example is a single HTML file with a rendered preview. See [`examples/`](./examples) to run them.
+Click an image to open the live example. The source of each one is a single HTML file in [`examples/`](./examples).
 
-| | |
-| --- | --- |
-| [![Country explorer](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-explorador-de-paises/preview.png)](./examples/01-explorador-de-paises) **Country explorer**<br>Hover, click, focus and localized country names. | [![Brazil heat map](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-mapa-de-calor-brasil/preview.png)](./examples/02-mapa-de-calor-brasil) **Choropleth map**<br>One `Region` per Brazilian state, colored by density or macro-region. |
-| [![Flight routes](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-rotas-aereas/preview.png)](./examples/03-rotas-aereas) **Flight routes**<br>Animated gradient arcs between airports. | [![Cities with markers](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-cidades-com-marcadores/preview.png)](./examples/04-cidades-com-marcadores) **Markers**<br>Pins, labels, click events and camera flights. |
-| [![Themes](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-temas/preview.png)](./examples/05-temas) **Themes**<br>Neon, forest and paper looks from `config.colors`. | |
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/01-explorador-de-paises/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-explorador-de-paises/preview.png" alt="Country explorer" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/01-explorador-de-paises/"><b>Country explorer</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/02-mapa-de-calor-brasil/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-mapa-de-calor-brasil/preview.png" alt="Brazil heat map" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/02-mapa-de-calor-brasil/"><b>Brazil heat map</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/03-rotas-aereas/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-rotas-aereas/preview.png" alt="Flight routes" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/03-rotas-aereas/"><b>Flight routes</b></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/04-cidades-com-marcadores/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-cidades-com-marcadores/preview.png" alt="Cities with markers" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/04-cidades-com-marcadores/"><b>Cities with markers</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/05-temas/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-temas/preview.png" alt="Themes" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/05-temas/"><b>Themes</b></a>
+    </td>
+    <td width="33%"></td>
+  </tr>
+</table>
 
 ## Features
 

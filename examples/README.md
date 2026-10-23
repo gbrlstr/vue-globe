@@ -10,7 +10,9 @@ Each folder has an `index.html` and a `preview.png`. The pages are plain HTML wi
 | [04 · Cities with markers](./04-cidades-com-marcadores) | `markers`, `markerClick`, `markerLabels`, camera flights |
 | [05 · Themes](./05-temas) | `config.colors` swapped at runtime |
 
-## Run them
+Live: <https://gbrlstr.github.io/vue-globe/examples/>
+
+## Run them locally
 
 From the repository root:
 
