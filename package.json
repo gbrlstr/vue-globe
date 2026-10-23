@@ -21,8 +21,28 @@
   "module": "./dist/vue-globe.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "globe.gif"
+    "dist"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gbrlstr/vue-globe.git"
+  },
+  "homepage": "https://github.com/gbrlstr/vue-globe#readme",
+  "bugs": {
+    "url": "https://github.com/gbrlstr/vue-globe/issues"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "globe",
+    "webgl",
+    "threejs",
+    "3d",
+    "map",
+    "countries"
   ],
   "scripts": {
     "dev": "vite",

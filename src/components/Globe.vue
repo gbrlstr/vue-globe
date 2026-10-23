@@ -2,13 +2,21 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { GlobeView } from '@/engine/view'
-import { resolveConfig, type GlobeConfig, type GlobeMarker, type Region, type RegionPointerEvent } from '@/types'
+import {
+  resolveConfig,
+  type GlobeAssets,
+  type GlobeConfig,
+  type GlobeMarker,
+  type Region,
+  type RegionPointerEvent,
+} from '@/types'
 
 const props = withDefaults(
   defineProps<{
     regions?: Region[]
     markers?: GlobeMarker[]
     config?: Partial<GlobeConfig>
+    assets?: GlobeAssets
   }>(),
   {
     regions: () => [],
@@ -54,12 +62,17 @@ defineExpose({ focus, highlight, clear, canvasRef })
 
 onMounted(() => {
   if (!canvasRef.value || !rootRef.value) return
-  view = new GlobeView(canvasRef.value, rootRef.value, {
-    onHover: (region) => emit('regionHover', region),
-    onClick: (region) => emit('regionClick', region),
-    onMiss: () => emit('pointerMiss'),
-    onReady: () => emit('ready'),
-  })
+  view = new GlobeView(
+    canvasRef.value,
+    rootRef.value,
+    {
+      onHover: (region) => emit('regionHover', region),
+      onClick: (region) => emit('regionClick', region),
+      onMiss: () => emit('pointerMiss'),
+      onReady: () => emit('ready'),
+    },
+    props.assets,
+  )
   sync()
 })
 

@@ -1,6 +1,6 @@
 # vue-globe
 
-![Globo girando, com países, grade e oceano](./globe.gif)
+![Globo girando, com países, grade e oceano](https://raw.githubusercontent.com/gbrlstr/vue-globe/main/globe.gif)
 
 Componente Vue 3 de um globo WebGL. O projeto que consome importa o componente, passa as regiões e decide o que fazer com hover e clique.
 
@@ -152,6 +152,28 @@ Cores: `border` `#005696`, `fill` `#e1251b`, `hover` `#ffffff`, `land` `#fefefe`
 
 Câmera: `lat` `-18`, `lng` `-58`, `distance` `5.35`, `fov` `40`.
 
+## Mapa e texturas
+
+O mapa dos países e as texturas do globo (cerca de 3,3 MB no total) não ficam dentro do JavaScript da biblioteca. Eles vêm como arquivos em `dist/assets`, e o bundler do seu projeto (Vite, webpack) copia esses arquivos para a build e resolve as URLs sozinho. Não precisa configurar nada.
+
+Para servir esses arquivos de outro lugar, como um CDN, passe `assets`. Tudo é opcional: o que você não informar usa o arquivo do pacote. O valor é lido uma vez, quando o componente monta.
+
+```vue
+<script setup>
+const assets = {
+  world: 'https://cdn.exemplo.com/globe/world-main.json',
+  textures: {
+    color: 'https://cdn.exemplo.com/globe/color_map.webp',
+    // sea, specular, bump e normal seguem o mesmo padrão
+  },
+}
+</script>
+
+<template>
+  <Globe :assets="assets" />
+</template>
+```
+
 ## Desenvolvimento
 
 ```bash
@@ -159,7 +181,9 @@ npm install
 npm run dev
 ```
 
-`npm run build` gera `dist/` para publicar ou ligar com `file:../vue-globe`.
+`npm run build` gera `dist/` (incluindo `dist/assets`) para publicar ou ligar com `file:../vue-globe`.
+
+No `npm run dev`, o app de teste em `src/dev` informa os arquivos de `src/assets` pela prop `assets`. O componente sozinho só encontra os arquivos padrão depois do build.
 
 ## Licença
 

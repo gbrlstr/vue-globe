@@ -2,7 +2,19 @@
 import { reactive, ref } from 'vue'
 
 import Globe from '@/components/Globe.vue'
-import { defaultConfig, type RegionPointerEvent } from '@/types'
+import { defaultConfig, type GlobeAssets, type RegionPointerEvent } from '@/types'
+import colorMapUrl from '@/assets/textures/color_map.webp?url'
+import seaMapUrl from '@/assets/textures/sea_map.webp?url'
+import specularMapUrl from '@/assets/textures/specular_map.webp?url'
+import bumpMapUrl from '@/assets/textures/bump_map.webp?url'
+import normalMapUrl from '@/assets/textures/normal_map.webp?url'
+import worldUrl from '@/assets/data/world-main.json?url'
+
+// No build da biblioteca os arquivos vão para dist/assets; no dev o Vite serve direto de src/assets.
+const assets: GlobeAssets = {
+  world: worldUrl,
+  textures: { color: colorMapUrl, sea: seaMapUrl, specular: specularMapUrl, bump: bumpMapUrl, normal: normalMapUrl },
+}
 
 const hovered = ref('nenhuma')
 const selected = ref<RegionPointerEvent | null>(null)
@@ -20,7 +32,7 @@ function onClick(event: RegionPointerEvent) {
 
 <template>
   <main>
-    <Globe :config="config" @region-hover="onHover" @region-click="onClick" @pointer-miss="selected = null" />
+    <Globe :config="config" :assets="assets" @region-hover="onHover" @region-click="onClick" @pointer-miss="selected = null" />
 
     <aside>
       <h1>vue-globe</h1>

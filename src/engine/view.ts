@@ -19,13 +19,15 @@ import {
   WebGLRenderer,
 } from 'three'
 
-import colorMapUrl from '@/assets/textures/color_map.webp?url'
-import seaMapUrl from '@/assets/textures/sea_map.webp?url'
-import specularMapUrl from '@/assets/textures/specular_map.webp?url'
-import bumpMapUrl from '@/assets/textures/bump_map.webp?url'
-import normalMapUrl from '@/assets/textures/normal_map.webp?url'
-import worldUrl from '@/assets/data/world-main.json?url'
-import { defaultConfig, type GlobeConfig, type GlobeMarker, type Region, type RegionPointerEvent } from '@/types'
+import {
+  defaultConfig,
+  type GlobeAssets,
+  type GlobeConfig,
+  type GlobeMarker,
+  type GlobeTextureUrls,
+  type Region,
+  type RegionPointerEvent,
+} from '@/types'
 
 import {
   buildRings,
@@ -41,6 +43,18 @@ import {
 import { findRegion, GLOBE_RADIUS, latLngToSphere } from './geo'
 import { createFillSphereMaterial, createGlobeMaterial } from './globeShader.js'
 import { HeatMap } from './heatmap'
+
+// No build (vite.config.ts), cada marcador vira `new URL("./assets/...", import.meta.url).href`
+// e o arquivo é copiado para dist/assets, em vez de ser embutido no JavaScript da biblioteca.
+// Fora do build (ex.: `npm run dev`) o marcador fica como está: passe `assets` ao componente.
+const defaultWorldUrl = '__VUE_GLOBE_ASSET__data/world-main.json'
+const defaultTextureUrls: GlobeTextureUrls = {
+  color: '__VUE_GLOBE_ASSET__textures/color_map.webp',
+  sea: '__VUE_GLOBE_ASSET__textures/sea_map.webp',
+  specular: '__VUE_GLOBE_ASSET__textures/specular_map.webp',
+  bump: '__VUE_GLOBE_ASSET__textures/bump_map.webp',
+  normal: '__VUE_GLOBE_ASSET__textures/normal_map.webp',
+}
 
 export interface GlobeViewOptions {
   regions: Region[]
@@ -105,6 +119,7 @@ export class GlobeView {
     canvas: HTMLCanvasElement,
     private readonly root: HTMLElement,
     private readonly handlers: GlobeViewHandlers,
+    private readonly assets: GlobeAssets = {},
   ) {
     this.renderer = new WebGLRenderer({
       canvas,
@@ -188,15 +203,20 @@ export class GlobeView {
 
   private async load() {
     try {
+      const urls = { ...defaultTextureUrls, ...this.assets.textures }
+      const worldUrl = this.assets.world ?? defaultWorldUrl
       const [textures, response] = await Promise.all([
         Promise.all([
-          this.loader.loadAsync(colorMapUrl),
-          this.loader.loadAsync(seaMapUrl),
-          this.loader.loadAsync(specularMapUrl),
-          this.loader.loadAsync(bumpMapUrl),
-          this.loader.loadAsync(normalMapUrl),
+          this.loader.loadAsync(urls.color),
+          this.loader.loadAsync(urls.sea),
+          this.loader.loadAsync(urls.specular),
+          this.loader.loadAsync(urls.bump),
+          this.loader.loadAsync(urls.normal),
         ]),
-        fetch(worldUrl).then((result) => result.json()),
+        fetch(worldUrl).then((result) => {
+          if (!result.ok) throw new Error(`Mapa não encontrado em ${worldUrl} (HTTP ${result.status})`)
+          return result.json()
+        }),
       ])
       if (this.disposed) return
 

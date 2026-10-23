@@ -71,6 +71,24 @@ export interface GlobeConfig {
   camera: GlobeCamera
 }
 
+export interface GlobeTextureUrls {
+  color: string
+  sea: string
+  specular: string
+  bump: string
+  normal: string
+}
+
+/**
+ * URLs dos arquivos pesados do globo (mapa e texturas). Tudo é opcional: o que
+ * não for informado usa o arquivo que vem no pacote. Lido uma vez, na montagem.
+ */
+export interface GlobeAssets {
+  /** GeoJSON dos países, no formato do `world-main.json` do pacote. */
+  world?: string
+  textures?: Partial<GlobeTextureUrls>
+}
+
 export const defaultConfig: GlobeConfig = {
   autoRotate: true,
   rotateSpeed: 0.12,
