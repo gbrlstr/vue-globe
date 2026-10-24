@@ -1,0 +1,42 @@
+name: Release
+
+# Ao enviar uma tag v*, publica no npm e cria a release no GitHub.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # criar a release
+  id-token: write   # provenance do npm
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+
+      - name: A tag precisa bater com a versão do package.json
+        run: |
+          if [ "v$(node -p "require('./package.json').version")" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME diferente da versão do package.json"; exit 1
+          fi
+
+      - run: npm run build
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Release no GitHub com as notas do CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## "v"$" {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Veja o CHANGELOG." > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
