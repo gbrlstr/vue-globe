@@ -7,6 +7,7 @@ export class HeatMap {
   private readonly heat: Float32Array
   private readonly image: ImageData
   private readonly ctx: CanvasRenderingContext2D
+  private active = false
 
   constructor(
     lngSpacing = 9,
@@ -35,16 +36,23 @@ export class HeatMap {
   }
 
   update(mouseUV: Vector2 | null) {
+    const hasMouse = !!mouseUV && mouseUV.x >= 0
+    // Sem rastro e sem mouse sobre o globo, a textura já está zerada: nada para recalcular nem enviar à GPU.
+    if (!this.active && !hasMouse) return
+    let alive = false
     for (let i = 0; i < this.heat.length; i++) {
       const next = this.heat[i]! * this.decay
-      this.heat[i] = next < 0.001 ? 0 : next
+      const value = next < 0.001 ? 0 : next
+      this.heat[i] = value
+      if (value > 0) alive = true
     }
 
-    if (mouseUV && mouseUV.x >= 0) {
+    if (hasMouse && mouseUV) {
       const col = Math.floor(mouseUV.x * this.cols) % this.cols
       const row = Math.max(0, Math.min(this.rows - 1, Math.floor(mouseUV.y * this.rows)))
       const index = row * this.cols + col
       this.heat[index] = Math.min(1, (this.heat[index] ?? 0) + this.strength)
+      alive = true
     }
 
     const data = this.image.data
@@ -55,6 +63,7 @@ export class HeatMap {
       data[pixel + 3] = 255
     }
 
+    this.active = alive
     this.ctx.putImageData(this.image, 0, 0)
     this.texture.needsUpdate = true
   }

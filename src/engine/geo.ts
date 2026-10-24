@@ -33,12 +33,44 @@ export function regionCentroid(region: Region) {
   return { lng: lng / ring.length, lat: lat / ring.length }
 }
 
+interface GeometryInfo {
+  bbox: [number, number, number, number]
+  area: number
+}
+
+// Caixa e área de cada geometria, calculadas uma vez: o hover testa todas as regiões a cada movimento do mouse.
+const infoCache = new WeakMap<object, GeometryInfo>()
+
+function infoOf(geometry: RegionGeometry): GeometryInfo {
+  const cached = infoCache.get(geometry)
+  if (cached) return cached
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  let minLng = Infinity
+  let minLat = Infinity
+  let maxLng = -Infinity
+  let maxLat = -Infinity
+  for (const polygon of polygons) {
+    for (const point of polygon[0] ?? []) {
+      if (point[0] < minLng) minLng = point[0]
+      if (point[0] > maxLng) maxLng = point[0]
+      if (point[1] < minLat) minLat = point[1]
+      if (point[1] > maxLat) maxLat = point[1]
+    }
+  }
+  const info: GeometryInfo = { bbox: [minLng, minLat, maxLng, maxLat], area: geometryArea(geometry) }
+  infoCache.set(geometry, info)
+  return info
+}
+
 export function findRegion(regions: Region[], lng: number, lat: number) {
   let match: Region | null = null
   let area = Infinity
   for (const region of regions) {
+    const info = infoOf(region.geometry)
+    const [minLng, minLat, maxLng, maxLat] = info.bbox
+    if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue
     if (!geometryContains(region.geometry, lng, lat)) continue
-    const next = geometryArea(region.geometry)
+    const next = info.area
     if (next < area) {
       match = region
       area = next

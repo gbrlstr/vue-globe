@@ -233,15 +233,19 @@ const fragmentShader = /* glsl */ `
         float autoCellBase = autoActive * cellPattern;
         float autoCell = autoCellBase * isOcean;
 
-        vec3 cloudBase = vWorldPosition * uNoiseScale;
-        vec3 warpOffset = vec3(
-            fbmWarp(cloudBase + vec3(uTime * uNoiseSpeed)),
-            fbmWarp(cloudBase + vec3(5.2, 1.3, 0.0) + vec3(uTime * uNoiseSpeed * 0.7)),
-            0.0
-        );
-        float cloud = fbm(cloudBase + 0.6 * warpOffset + vec3(uTime * uNoiseSpeed * 0.4)) * 0.5 + 0.5;
-        cloud = smoothstep(0.25, 0.75, cloud);
-        cloud = mix(cloud, 1.0 - cloud, isGlitched);
+        // Ruído de nuvens é a parte mais cara do shader: só roda no oceano e com as nuvens ligadas.
+        float cloud = 0.0;
+        if (uNoiseStrength > 0.0 && isOcean > 0.001) {
+            vec3 cloudBase = vWorldPosition * uNoiseScale;
+            vec3 warpOffset = vec3(
+                fbmWarp(cloudBase + vec3(uTime * uNoiseSpeed)),
+                fbmWarp(cloudBase + vec3(5.2, 1.3, 0.0) + vec3(uTime * uNoiseSpeed * 0.7)),
+                0.0
+            );
+            cloud = fbm(cloudBase + 0.6 * warpOffset + vec3(uTime * uNoiseSpeed * 0.4)) * 0.5 + 0.5;
+            cloud = smoothstep(0.25, 0.75, cloud);
+            cloud = mix(cloud, 1.0 - cloud, isGlitched);
+        }
 
         vec3 oceanBase = texOcean.rgb * 2.;
 

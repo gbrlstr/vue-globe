@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
 
 import { GlobeView } from '@/engine/view'
 import {
@@ -43,11 +43,16 @@ const resolved = computed(() => resolveConfig(props.config))
 
 let view: GlobeView | undefined
 
+// Lê as coordenadas pelo objeto original: passar por um proxy reativo deixa o desenho e o hover muito mais lentos.
+function plainRegions() {
+  return toRaw(props.regions).map((region) => ({ ...toRaw(region), geometry: toRaw(region.geometry) }))
+}
+
 function sync() {
   view?.setOptions({
-    regions: props.regions,
-    markers: props.markers,
-    arcs: props.arcs,
+    regions: plainRegions(),
+    markers: toRaw(props.markers),
+    arcs: toRaw(props.arcs),
     config: resolved.value,
   })
 }
@@ -94,10 +99,10 @@ watch(
   () => sync(),
   { deep: true },
 )
+// Só id, cores e trava importam para redesenhar. Um watch profundo percorreria todas as coordenadas a cada mudança.
 watch(
-  () => props.regions,
+  () => [props.regions, props.regions.map((r) => `${r.id}|${r.fill ?? ''}|${r.border ?? ''}|${r.locked ? 1 : 0}`).join(',')],
   () => sync(),
-  { deep: true },
 )
 watch(
   () => props.markers,

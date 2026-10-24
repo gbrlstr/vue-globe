@@ -153,6 +153,38 @@ export function buildRings(rings: number[][][], radius: number) {
   return geometries
 }
 
+/**
+ * Junta várias polilinhas em um só buffer de posições e um índice de segmentos, para desenhar tudo com
+ * uma chamada. `counts` diz quantos índices cada polilinha ocupa, na ordem em que entraram.
+ */
+export function mergePolylines(geometries: BufferGeometry[]) {
+  let vertices = 0
+  let indices = 0
+  for (const geometry of geometries) {
+    const count = geometry.getAttribute('position').count
+    vertices += count
+    indices += Math.max(0, count - 1) * 2
+  }
+  const position = new Float32Array(vertices * 3)
+  const index = new Uint32Array(indices)
+  const counts: number[] = []
+  let vertex = 0
+  let cursor = 0
+  for (const geometry of geometries) {
+    const attribute = geometry.getAttribute('position')
+    const count = attribute.count
+    position.set(attribute.array as Float32Array, vertex * 3)
+    for (let i = 0; i < count - 1; i++) {
+      index[cursor++] = vertex + i
+      index[cursor++] = vertex + i + 1
+    }
+    counts.push(Math.max(0, count - 1) * 2)
+    vertex += count
+    geometry.dispose()
+  }
+  return { position, index, counts }
+}
+
 export function findFeatureAtLatLng(lat: number, lng: number, features: IndexedFeature[]) {
   for (const feature of features) {
     const [minLng, minLat, maxLng, maxLat] = feature.bbox
@@ -195,8 +227,13 @@ export function paintGeometry(
     }
 
     let outer = unwrapRing(rawRing)
-    const lngs = outer.map((point) => point[0])
-    const lngRange = Math.max(...lngs) - Math.min(...lngs)
+    let minLng = Infinity
+    let maxLng = -Infinity
+    for (const point of outer) {
+      if (point[0] < minLng) minLng = point[0]
+      if (point[0] > maxLng) maxLng = point[0]
+    }
+    const lngRange = maxLng - minLng
     const isPolar = lngRange > 300
     let poleY = 0
     if (isPolar && crossing >= 0) {

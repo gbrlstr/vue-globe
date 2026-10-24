@@ -2,21 +2,24 @@ import { countryName } from './countries'
 import {
   ACESFilmicToneMapping,
   AdditiveBlending,
+  BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   Color,
   FrontSide,
   Group,
-  Line,
   LineBasicMaterial,
+  LineSegments,
   Mesh,
   PerspectiveCamera,
   Raycaster,
   Scene,
   ShaderMaterial,
+  Sphere,
   SRGBColorSpace,
   TextureLoader,
   Vector2,
+  Vector3,
   WebGLRenderer,
 } from 'three'
 
@@ -38,12 +41,13 @@ import {
   FILL_TEX_W,
   findFeatureAtLatLng,
   indexWorld,
+  mergePolylines,
   paintGeometry,
   type CountryLines,
   type IndexedFeature,
 } from './borders'
 import { ArcLayer } from './arcs'
-import { findRegion, GLOBE_RADIUS, latLngToSphere } from './geo'
+import { findRegion, GLOBE_RADIUS, latLngToSphere, sphereToLatLng } from './geo'
 import { createFillSphereMaterial, createGlobeMaterial } from './globeShader.js'
 import { HeatMap } from './heatmap'
 import { MarkerLayer } from './markers'
@@ -59,6 +63,12 @@ const defaultTextureUrls: GlobeTextureUrls = {
   bump: '__VUE_GLOBE_ASSET__textures/bump_map.webp',
   normal: '__VUE_GLOBE_ASSET__textures/normal_map.webp',
 }
+
+// As camadas de hover e seleção são repintadas a cada mudança de região e enviadas inteiras à GPU.
+// Em metade da resolução o envio custa um quarto, e a borda do país continua nítida por causa da linha.
+const HIGHLIGHT_TEXTURE_SCALE = 0.5
+// A resolução cai, no máximo até aqui, quando a placa de vídeo não dá conta de 60 quadros por segundo.
+const MIN_PIXEL_RATIO = 0.75
 
 export interface GlobeViewOptions {
   regions: Region[]
@@ -91,8 +101,22 @@ export class GlobeView {
   private atmosphere: Mesh | null = null
   private shader: ShaderMaterial | null = null
   private heat: HeatMap | null = null
-  private countries = new Group()
   private customLines = new Group()
+  private borderMaterial: LineBasicMaterial | null = null
+  private borderRanges = new Map<string, { start: number; count: number }>()
+  private hoverBorders: LineSegments | null = null
+  private selectedBorders: LineSegments | null = null
+  private borders: LineSegments | null = null
+  private readonly globeSphere = new Sphere(new Vector3(), GLOBE_RADIUS)
+  private readonly hitPoint = new Vector3()
+  private pointerDirty = false
+  private onScreen = true
+  private readonly visibilityObserver: IntersectionObserver | null
+  private pixelRatio = 1
+  private maxPixelRatio = 1
+  private frameMs = 16
+  private frameCount = 0
+  private lastFrame = 0
   private hoverCtx: CanvasRenderingContext2D | null = null
   private hoverTexture: CanvasTexture | null = null
   private hoverMat: ShaderMaterial | null = null
@@ -103,7 +127,6 @@ export class GlobeView {
   private regionFillTexture: CanvasTexture | null = null
   private regionFillMat: ShaderMaterial | null = null
   private regionFillPainted = false
-  private materials = new Map<string, LineBasicMaterial>()
   private features: IndexedFeature[] = []
   private raw = new Map<string, { type: 'Polygon' | 'MultiPolygon'; coordinates: number[][][] | number[][][][] }>()
   private names = new Map<string, string>()
@@ -146,11 +169,13 @@ export class GlobeView {
     this.renderer.outputColorSpace = SRGBColorSpace
     this.renderer.toneMapping = ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.25
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
+    this.maxPixelRatio = Math.min(window.devicePixelRatio, 1.75)
+    this.pixelRatio = this.maxPixelRatio
+    this.renderer.setPixelRatio(this.pixelRatio)
 
     this.camera = new PerspectiveCamera(defaultConfig.camera.fov, 1, 0.1, 100)
     this.lookAt(defaultConfig.camera.lat, defaultConfig.camera.lng)
-    this.scene.add(this.countries, this.customLines)
+    this.scene.add(this.customLines)
     this.markerLayer = new MarkerLayer(root)
     this.arcLayer = new ArcLayer()
     this.scene.add(this.markerLayer.group, this.arcLayer.group)
@@ -158,6 +183,15 @@ export class GlobeView {
     this.resize()
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(root)
+    // Fora da tela não há por que desenhar.
+    this.visibilityObserver =
+      typeof IntersectionObserver === 'undefined'
+        ? null
+        : new IntersectionObserver((entries) => {
+            const last = entries[entries.length - 1]
+            if (last) this.onScreen = last.isIntersecting
+          })
+    this.visibilityObserver?.observe(root)
 
     canvas.addEventListener('pointerdown', this.onPointerDown)
     canvas.addEventListener('pointermove', this.onPointerMove)
@@ -218,12 +252,19 @@ export class GlobeView {
     this.disposed = true
     cancelAnimationFrame(this.raf)
     this.resizeObserver.disconnect()
+    this.visibilityObserver?.disconnect()
     const canvas = this.renderer.domElement
     canvas.removeEventListener('pointerdown', this.onPointerDown)
     canvas.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
     this.heat?.dispose()
+    this.borders?.geometry.dispose()
+    this.borderMaterial?.dispose()
+    this.hoverBorders?.geometry.dispose()
+    this.selectedBorders?.geometry.dispose()
+    this.hoverBorders?.material instanceof LineBasicMaterial && this.hoverBorders.material.dispose()
+    this.selectedBorders?.material instanceof LineBasicMaterial && this.selectedBorders.material.dispose()
     this.scene.remove(this.markerLayer.group, this.arcLayer.group)
     this.markerLayer.dispose()
     this.arcLayer.dispose()
@@ -319,9 +360,9 @@ export class GlobeView {
   private createFillLayers() {
     const geometry = buildSphere(GLOBE_RADIUS * 1.005, 64, 64)
     // Preenchimento das regiões (cor de cada `Region.fill`), por baixo do hover e da seleção.
-    const regionFill = this.makeFillLayer(geometry, 1, '#ffffff')
-    const hover = this.makeFillLayer(geometry, 2, this.options.config.colors.hover)
-    const selected = this.makeFillLayer(geometry, 3, this.options.config.colors.fill)
+    const regionFill = this.makeFillLayer(geometry, 1, '#ffffff', 1)
+    const hover = this.makeFillLayer(geometry, 2, this.options.config.colors.hover, HIGHLIGHT_TEXTURE_SCALE)
+    const selected = this.makeFillLayer(geometry, 3, this.options.config.colors.fill, HIGHLIGHT_TEXTURE_SCALE)
     this.regionFillCtx = regionFill.ctx
     this.regionFillTexture = regionFill.texture
     this.regionFillMat = regionFill.material
@@ -334,12 +375,14 @@ export class GlobeView {
     this.scene.add(regionFill.mesh, hover.mesh, selected.mesh)
   }
 
-  private makeFillLayer(geometry: BufferGeometry, order: number, color: string) {
+  private makeFillLayer(geometry: BufferGeometry, order: number, color: string, scale: number) {
     const canvas = document.createElement('canvas')
-    canvas.width = FILL_TEX_W
-    canvas.height = FILL_TEX_H
+    canvas.width = Math.round(FILL_TEX_W * scale)
+    canvas.height = Math.round(FILL_TEX_H * scale)
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('Canvas 2D indisponível')
+    // O desenho continua em coordenadas de 4096 x 2048; a escala cuida de caber no canvas menor.
+    ctx.scale(scale, scale)
     const texture = new CanvasTexture(canvas)
     const material = createFillSphereMaterial(texture, color) as ShaderMaterial
     const mesh = new Mesh(geometry, material)
@@ -348,48 +391,91 @@ export class GlobeView {
     return { ctx, texture, material, mesh }
   }
 
+  // Todas as bordas dos países viram um único objeto (uma chamada de desenho). O destaque de hover e de
+  // seleção reaproveita os mesmos buffers e só muda o trecho desenhado.
   private addCountryLines(groups: CountryLines[]) {
-    const color = new Color(this.options.config.colors.border)
+    const polylines = groups.flatMap((group) => group.geometries)
+    const { position, index, counts } = mergePolylines(polylines)
+
+    this.borderRanges.clear()
+    let polyline = 0
+    let start = 0
     for (const group of groups) {
+      let count = 0
+      for (let i = 0; i < group.geometries.length; i++) count += counts[polyline++] ?? 0
+      this.borderRanges.set(group.code, { start, count })
+      start += count
+    }
+
+    const positionAttribute = new BufferAttribute(position, 3)
+    const indexAttribute = new BufferAttribute(index, 1)
+    const makeLines = (opacity: number, order: number) => {
+      const geometry = new BufferGeometry()
+      geometry.setAttribute('position', positionAttribute)
+      geometry.setIndex(indexAttribute)
       const material = new LineBasicMaterial({
-        color,
+        color: new Color(this.options.config.colors.border),
         transparent: true,
-        opacity: this.options.config.lineOpacity,
+        opacity,
         depthTest: true,
         depthWrite: false,
       })
-      this.materials.set(group.code, material)
-      for (const geometry of group.geometries) {
-        const line = new Line(geometry, material)
-        line.raycast = () => {}
-        this.countries.add(line)
-      }
+      const lines = new LineSegments(geometry, material)
+      lines.raycast = () => {}
+      lines.frustumCulled = false
+      lines.renderOrder = order
+      this.scene.add(lines)
+      return lines
     }
+    this.borders = makeLines(this.options.config.lineOpacity, 0)
+    this.borderMaterial = this.borders.material as LineBasicMaterial
+    this.hoverBorders = makeLines(1, 0)
+    this.selectedBorders = makeLines(1, 0)
+    this.hoverBorders.visible = false
+    this.selectedBorders.visible = false
+  }
+
+  private applyBorderHighlight() {
+    const show = (lines: LineSegments | null, id: string | null) => {
+      if (!lines) return
+      const range = id ? this.borderRanges.get(id) : undefined
+      lines.visible = !!range && this.options.config.showLines
+      if (range) lines.geometry.setDrawRange(range.start, range.count)
+    }
+    show(this.hoverBorders, this.hoveredId !== this.selectedId ? this.hoveredId : null)
+    show(this.selectedBorders, this.selectedId)
   }
 
   private rebuildCustomLines() {
     for (const child of [...this.customLines.children]) {
       this.customLines.remove(child)
-      if (child instanceof Line) {
+      if (child instanceof LineSegments) {
         child.geometry.dispose()
         if (child.material instanceof LineBasicMaterial) child.material.dispose()
       }
     }
     this.paintRegionFills()
+
+    // Uma chamada de desenho por cor de borda, não uma por anel de cada região.
+    const byColor = new Map<string, BufferGeometry[]>()
     for (const region of this.options.regions) {
       const polygons = region.geometry.type === 'Polygon' ? [region.geometry.coordinates] : region.geometry.coordinates
-      const material = new LineBasicMaterial({
-        color: region.border ?? this.options.config.colors.border,
-        transparent: true,
-        opacity: 0.9,
-      })
-      for (const polygon of polygons) {
-        for (const geometry of buildRings(polygon, GLOBE_RADIUS)) {
-          const line = new Line(geometry, material)
-          line.raycast = () => {}
-          this.customLines.add(line)
-        }
-      }
+      const color = region.border ?? this.options.config.colors.border
+      const list = byColor.get(color) ?? []
+      for (const polygon of polygons) list.push(...buildRings(polygon, GLOBE_RADIUS))
+      byColor.set(color, list)
+    }
+    for (const [color, geometries] of byColor) {
+      if (!geometries.length) continue
+      const { position, index } = mergePolylines(geometries)
+      const geometry = new BufferGeometry()
+      geometry.setAttribute('position', new BufferAttribute(position, 3))
+      geometry.setIndex(new BufferAttribute(index, 1))
+      const material = new LineBasicMaterial({ color, transparent: true, opacity: 0.9 })
+      const lines = new LineSegments(geometry, material)
+      lines.raycast = () => {}
+      lines.frustumCulled = false
+      this.customLines.add(lines)
     }
   }
 
@@ -419,17 +505,21 @@ export class GlobeView {
 
   private applyAppearance() {
     const { config } = this.options
-    this.countries.visible = config.showLines
+    if (this.borders) this.borders.visible = config.showLines
     this.customLines.visible = config.showLines
     this.markerLayer.configure(this.options.markers, config)
     this.arcLayer.configure(this.options.arcs, config)
     this.applyRegionFillOpacity()
 
     const border = new Color(config.colors.border)
-    for (const [code, material] of this.materials) {
-      material.color.copy(border)
-      if (code !== this.hoveredId && code !== this.selectedId) material.opacity = config.lineOpacity
+    if (this.borderMaterial) {
+      this.borderMaterial.color.copy(border)
+      this.borderMaterial.opacity = config.lineOpacity
     }
+    for (const lines of [this.hoverBorders, this.selectedBorders]) {
+      if (lines?.material instanceof LineBasicMaterial) lines.material.color.copy(border)
+    }
+    this.applyBorderHighlight()
 
     this.setColor('uOceanTint', config.colors.ocean, true)
     this.setColor('uLandColor', config.colors.land)
@@ -498,6 +588,7 @@ export class GlobeView {
     if (width < 2 || height < 2) return
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
+    this.renderer.setPixelRatio(this.pixelRatio)
     this.renderer.setSize(width, height, false)
   }
 
@@ -505,6 +596,18 @@ export class GlobeView {
     if (this.disposed) return
     const delta = this.elapsed ? Math.min((now - this.elapsed) / 1000, 0.05) : 0
     this.elapsed = now
+    if (!this.onScreen) {
+      this.lastFrame = 0
+      this.raf = requestAnimationFrame(this.frame)
+      return
+    }
+    this.tuneResolution(now)
+
+    // O hover é resolvido uma vez por quadro, não uma vez por evento de ponteiro (que pode chegar a mais de 100 por segundo).
+    if (this.pointerDirty && !this.dragging) {
+      this.pointerDirty = false
+      this.updateHover()
+    }
 
     if (this.options.config.autoRotate && !this.dragging) {
       this.yaw += delta * this.options.config.rotateSpeed
@@ -525,21 +628,39 @@ export class GlobeView {
     this.raf = requestAnimationFrame(this.frame)
   }
 
-  private pick() {
-    if (!this.globe || !this.options.config.interactive) return null
+  // Se o quadro demora para sair, desenha em resolução menor. Só desce, nunca volta, para não oscilar.
+  private tuneResolution(now: number) {
+    if (this.lastFrame) {
+      const interval = now - this.lastFrame
+      if (interval < 250) this.frameMs += (interval - this.frameMs) * 0.1
+    }
+    this.lastFrame = now
+    if (++this.frameCount % 45 !== 0 || this.frameCount < 90) return
+    if (this.frameMs > 24 && this.pixelRatio > MIN_PIXEL_RATIO) {
+      this.pixelRatio = Math.max(MIN_PIXEL_RATIO, this.pixelRatio - 0.25)
+      this.resize()
+      this.frameMs = 16
+    }
+  }
+
+  // Ponto do globo sob o ponteiro. Conta direta de raio com esfera, sem testar os triângulos da malha.
+  private castGlobe() {
     this.raycaster.setFromCamera(this.pointer, this.camera)
-    const hit = this.raycaster.intersectObject(this.globe, false)[0]
+    const point = this.raycaster.ray.intersectSphere(this.globeSphere, this.hitPoint)
+    if (!point) return null
+    return { point, distance: this.raycaster.ray.origin.distanceTo(point) }
+  }
+
+  private pick(cast: ReturnType<GlobeView['castGlobe']>) {
+    if (!this.globe || !this.options.config.interactive) return null
     const mouse = this.shader?.uniforms.uMouseUV?.value as Vector2 | undefined
-    if (!hit) {
+    if (!cast) {
       mouse?.set(-1, -1)
       return null
     }
-    if (hit.uv && mouse) mouse.copy(hit.uv)
-
-    const radius = hit.point.length() || 1
-    const lat = (Math.asin(hit.point.y / radius) * 180) / Math.PI
-    let lng = (Math.atan2(hit.point.z, -hit.point.x) * 180) / Math.PI - 180
-    if (lng < -180) lng += 360
+    const { lat, lng } = sphereToLatLng(cast.point.x, cast.point.y, cast.point.z)
+    // Mesma projeção do shader: u pela longitude e v pela latitude.
+    mouse?.set((lng + 180) / 360, (lat + 90) / 180)
 
     const custom = findRegion(this.options.regions, lng, lat)
     const feature = custom ? null : findFeatureAtLatLng(lat, lng, this.features)
@@ -560,15 +681,8 @@ export class GlobeView {
   }
 
   private setHover(id: string | null) {
-    if (this.hoveredId && this.hoveredId !== this.selectedId) {
-      const previous = this.materials.get(this.hoveredId)
-      if (previous) previous.opacity = this.options.config.lineOpacity
-    }
     this.hoveredId = id
-    if (id && id !== this.selectedId) {
-      const next = this.materials.get(id)
-      if (next) next.opacity = 1
-    }
+    this.applyBorderHighlight()
     this.paintHover(id && id !== this.selectedId ? id : null)
   }
 
@@ -623,24 +737,27 @@ export class GlobeView {
       this.applyOrbit()
     }
 
-    const hit = this.pick()
+    this.pointerDirty = !this.dragging
+  }
+
+  private updateHover() {
+    const cast = this.castGlobe()
+    const hit = this.pick(cast)
     const nextId = hit?.region.id ?? this.pinnedId
     if (nextId !== this.hoveredId) {
       this.setHover(nextId)
       this.handlers.onHover(hit)
     }
 
-    const marker = this.pickMarker()
+    const marker = this.pickMarker(cast)
     this.setMarkerHover(marker)
     this.renderer.domElement.style.cursor = hit || marker ? 'pointer' : 'grab'
   }
 
-  // Marcador sob o ponteiro, se não estiver escondido atrás do globo.
-  private pickMarker() {
+  // Marcador sob o ponteiro, se não estiver escondido atrás do globo. Usa o raio já preparado em castGlobe.
+  private pickMarker(cast: ReturnType<GlobeView['castGlobe']>) {
     if (!this.options.config.interactive) return null
-    this.raycaster.setFromCamera(this.pointer, this.camera)
-    const globeHit = this.globe ? this.raycaster.intersectObject(this.globe, false)[0] : undefined
-    return this.markerLayer.pick(this.raycaster, globeHit ? globeHit.distance + 0.05 : Infinity)
+    return this.markerLayer.pick(this.raycaster, cast ? cast.distance + 0.05 : Infinity)
   }
 
   private setMarkerHover(marker: GlobeMarker | null) {
@@ -655,26 +772,26 @@ export class GlobeView {
     if (!this.dragging) return
     this.setPointer(event)
     this.dragging = false
+    this.pointerDirty = true
     if (this.moved || !this.options.config.interactive) return
-    const marker = this.pickMarker()
+    const cast = this.castGlobe()
+    const marker = this.pickMarker(cast)
     if (marker) {
       this.handlers.onMarkerClick(marker)
       return
     }
-    const hit = this.pick()
+    const hit = this.pick(cast)
     if (hit) {
       this.selectedId = hit.region.id
-      const material = this.materials.get(hit.region.id)
-      if (material) material.opacity = 1
+      this.applyBorderHighlight()
       this.paintSelected(hit.region.id)
       this.paintHover(null)
       this.handlers.onClick(hit)
       return
     }
     if (this.selectedId) {
-      const material = this.materials.get(this.selectedId)
-      if (material) material.opacity = this.options.config.lineOpacity
       this.selectedId = null
+      this.applyBorderHighlight()
       this.paintSelected(null)
       this.handlers.onMiss()
     }
