@@ -1,5 +1,7 @@
 # vue-globe
 
+[![npm](https://img.shields.io/npm/v/vue-globe.svg)](https://www.npmjs.com/package/vue-globe) [![license](https://img.shields.io/npm/l/vue-globe.svg)](./LICENSE) [![bundle size](https://img.shields.io/bundlephobia/minzip/vue-globe)](https://bundlephobia.com/package/vue-globe)
+
 **Um globo WebGL interativo para Vue 3.** Países com hover e clique, marcadores, arcos animados, mapas de calor e temas, em cerca de 16 KB de JavaScript comprimido (o three.js é dependência peer).
 
 🇺🇸 [Read in English](./README.md)
@@ -176,7 +178,7 @@ const globe = ref(null)
 
 | Método | O que faz |
 | --- | --- |
-| `focus(id)` | Leva a câmera até um país (código de 3 letras, como `JPN`), uma região sua ou um marcador. |
+| `focus(id, options?)` | Leva a câmera até um país (código de 3 letras, como `JPN`), uma região sua ou um marcador. `options`: `{ duration: 900, distance }`. Com `duration: 0` a câmera salta. Arrastar ou dar zoom cancela o voo. |
 | `highlight(id)` | Destaca um país pelo código de 3 letras. O destaque fica até `highlight(null)` ou `clear()`. |
 | `clear()` | Remove a seleção e o destaque. |
 
@@ -195,13 +197,19 @@ interface Region {
   data?: unknown
 }
 
-interface GlobeMarker { id: string; lat: number; lng: number; label?: string; color?: string; data?: unknown }
+interface GlobeMarker {
+  id: string; lat: number; lng: number
+  label?: string; color?: string
+  altitude?: number // em raios do globo. Com altura o pino flutua e ganha uma haste até o chão
+  data?: unknown
+}
 
 interface GlobeArc {
   id: string
   from: { lat: number; lng: number }
-  to: { lat: number; lng: number }
+  to: { lat: number; lng: number; altitude?: number } // `from` também aceita altitude
   color?: string | [string, string] // uma cor, ou [início, fim] para degradê
+  altitude?: number // altura do ponto mais alto do arco, em raios do globo. Por padrão cresce com a distância
   data?: unknown
 }
 ```
@@ -213,6 +221,9 @@ interface GlobeArc {
 | `autoRotate` | `true` | Gira a câmera sozinha |
 | `rotateSpeed` | `0.12` | Velocidade da rotação, em radianos por segundo |
 | `interactive` | `true` | Arrastar, hover e clique |
+| `zoom` | `true` | Zoom com a roda do mouse e pinça. A roda fica presa ao globo enquanto o ponteiro está sobre ele |
+| `minDistance` | `2.8` | Mais perto que a câmera chega do centro (o globo tem raio 2) |
+| `maxDistance` | `12` | Mais longe que a câmera chega |
 | `locale` | `'en'` | Idioma dos nomes de país (BCP 47, como `pt-BR`). Só vale para países sem nome no mapa |
 | `showLines` | `true` | Bordas dos países |
 | `showGrid` | `true` | Grade sobre o oceano |

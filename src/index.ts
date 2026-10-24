@@ -4,6 +4,7 @@ export { Globe }
 export default Globe
 export { defaultConfig, resolveConfig } from './types'
 export type {
+  FocusOptions,
   GlobeArc,
   GlobeAssets,
   GlobeCamera,

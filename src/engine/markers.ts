@@ -1,5 +1,10 @@
 import {
+  BufferGeometry,
+  Color,
+  Float32BufferAttribute,
   Group,
+  LineBasicMaterial,
+  LineSegments,
   Mesh,
   MeshBasicMaterial,
   SphereGeometry,
@@ -18,11 +23,17 @@ const LIFT = 1.012
 const HIT_SCALE = 2.6
 const HOVER_SCALE = 1.5
 const PULSE_SECONDS = 2
+// A haste de um pino com altura começa na superfície, um pouco acima das bordas dos países.
+const STEM_START = 1.003
+const MAX_ALTITUDE = 5
 
 interface MarkerItem {
   marker: GlobeMarker
   position: Vector3
   normal: Vector3
+  altitude: number
+  /** Posição da haste no buffer de linhas, ou -1 quando o pino está no chão. */
+  stem: number
   dot: Mesh
   halo: Mesh
   hit: Mesh
@@ -49,6 +60,8 @@ export class MarkerLayer {
   private readonly cameraPosition = new Vector3()
   private readonly cameraDirection = new Vector3()
   private readonly projected = new Vector3()
+  private readonly toMarker = new Vector3()
+  private stems: LineSegments | null = null
 
   private config: GlobeConfig | null = null
   private stamp = ''
@@ -140,7 +153,7 @@ export class MarkerLayer {
       const hovered = item.marker.id === this.hoveredId
       const size = config.markerSize * (hovered ? HOVER_SCALE : 1)
       // Pino e rótulo somem juntos no horizonte, para o pino não flutuar para fora da borda do globo.
-      const facing = item.normal.dot(this.cameraDirection) > limit
+      const facing = this.isVisible(item, limit)
       item.facing = facing
       item.dot.visible = facing
       item.halo.visible = facing
@@ -172,13 +185,13 @@ export class MarkerLayer {
   }
 
   private stampOf(markers: GlobeMarker[], config: GlobeConfig) {
-    const list = markers.map((m) => `${m.id}:${m.label ?? ''}:${m.color ?? ''}:${Number.isFinite(m.lat + m.lng)}`).join('|')
+    const list = markers.map((m) => `${m.id}:${m.label ?? ''}:${m.color ?? ''}:${Number.isFinite(m.lat + m.lng)}:${altitudeOf(m) > 0 ? 1 : 0}`).join('|')
     const { colors } = config
     return `${list}#${colors.marker}|${colors.label}|${colors.labelBackground}|${config.markerLabels}`
   }
 
   private positionStampOf(markers: GlobeMarker[]) {
-    return markers.map((m) => `${m.lat}:${m.lng}`).join('|')
+    return markers.map((m) => `${m.lat}:${m.lng}:${m.altitude ?? 0}`).join('|')
   }
 
   private move(markers: GlobeMarker[]) {
@@ -187,12 +200,16 @@ export class MarkerLayer {
       const item = this.items.get(marker.id)
       if (!item || moved.has(marker.id) || !Number.isFinite(marker.lat + marker.lng)) continue
       moved.add(marker.id)
-      const [x, y, z] = latLngToSphere(marker.lat, marker.lng, GLOBE_RADIUS * LIFT)
+      const altitude = altitudeOf(marker)
+      const [x, y, z] = latLngToSphere(marker.lat, marker.lng, GLOBE_RADIUS * (LIFT + altitude))
       item.marker = marker
+      item.altitude = altitude
       item.position.set(x, y, z)
       item.normal.copy(item.position).normalize()
       for (const mesh of [item.dot, item.halo, item.hit]) mesh.position.copy(item.position)
+      this.writeStem(item)
     }
+    if (this.stems) this.stems.geometry.getAttribute('position').needsUpdate = true
   }
 
   private rebuild(markers: GlobeMarker[], config: GlobeConfig) {
@@ -202,7 +219,8 @@ export class MarkerLayer {
       if (!Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) continue
       if (this.items.has(marker.id)) continue
 
-      const [x, y, z] = latLngToSphere(marker.lat, marker.lng, GLOBE_RADIUS * LIFT)
+      const altitude = altitudeOf(marker)
+      const [x, y, z] = latLngToSphere(marker.lat, marker.lng, GLOBE_RADIUS * (LIFT + altitude))
       const position = new Vector3(x, y, z)
       const color = marker.color ?? config.colors.marker
       usedColors.add(color)
@@ -225,6 +243,8 @@ export class MarkerLayer {
         marker,
         position,
         normal: position.clone().normalize(),
+        altitude,
+        stem: -1,
         dot,
         halo,
         hit,
@@ -234,6 +254,8 @@ export class MarkerLayer {
       })
     }
 
+    this.buildStems(markers, config)
+
     // Descarta os materiais de cores que não estão mais em uso.
     for (const [color, material] of this.materials) {
       if (usedColors.has(color)) continue
@@ -241,6 +263,57 @@ export class MarkerLayer {
       material.halo.dispose()
       this.materials.delete(color)
     }
+  }
+
+  // Uma única linha por pino com altura, todas no mesmo objeto, ligando o chão ao pino.
+  private buildStems(markers: GlobeMarker[], config: GlobeConfig) {
+    const elevated = [...this.items.values()].filter((item) => item.altitude > 0)
+    if (!elevated.length) return
+    const colors: number[] = []
+    elevated.forEach((item, index) => {
+      item.stem = index * 6
+      const color = new Color(item.marker.color ?? config.colors.marker)
+      colors.push(color.r, color.g, color.b, color.r, color.g, color.b)
+    })
+    const geometry = new BufferGeometry()
+    geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(elevated.length * 6), 3))
+    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3))
+    this.stems = new LineSegments(
+      geometry,
+      new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false }),
+    )
+    this.stems.frustumCulled = false
+    this.stems.raycast = () => {}
+    this.stems.renderOrder = 5
+    this.group.add(this.stems)
+    for (const item of elevated) this.writeStem(item)
+    this.stems.geometry.getAttribute('position').needsUpdate = true
+    void markers
+  }
+
+  private writeStem(item: MarkerItem) {
+    if (!this.stems || item.stem < 0) return
+    const array = this.stems.geometry.getAttribute('position').array as Float32Array
+    const foot = STEM_START / (LIFT + item.altitude)
+    array[item.stem] = item.position.x * foot
+    array[item.stem + 1] = item.position.y * foot
+    array[item.stem + 2] = item.position.z * foot
+    array[item.stem + 3] = item.position.x
+    array[item.stem + 4] = item.position.y
+    array[item.stem + 5] = item.position.z
+  }
+
+  /** Pino com altura aparece além da borda do globo; só some se o globo realmente estiver na frente dele. */
+  private isVisible(item: MarkerItem, limit: number) {
+    if (item.altitude <= 0) return item.normal.dot(this.cameraDirection) > limit
+    const direction = this.toMarker.copy(item.position).sub(this.cameraPosition)
+    const length = direction.length()
+    if (length < 1e-6) return true
+    direction.divideScalar(length)
+    const closest = -this.cameraPosition.dot(direction)
+    if (closest <= 0 || closest >= length) return true
+    const gap = this.cameraPosition.lengthSq() - closest * closest
+    return gap > GLOBE_RADIUS * GLOBE_RADIUS
   }
 
   private createLabel(text: string, config: GlobeConfig) {
@@ -291,5 +364,16 @@ export class MarkerLayer {
     }
     this.items.clear()
     this.hitMeshes.length = 0
+    if (this.stems) {
+      this.group.remove(this.stems)
+      this.stems.geometry.dispose()
+      if (this.stems.material instanceof LineBasicMaterial) this.stems.material.dispose()
+      this.stems = null
+    }
   }
+}
+
+function altitudeOf(marker: GlobeMarker) {
+  const value = marker.altitude ?? 0
+  return Number.isFinite(value) ? Math.max(0, Math.min(MAX_ALTITUDE, value)) : 0
 }

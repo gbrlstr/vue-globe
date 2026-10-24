@@ -26,6 +26,7 @@ import {
 import {
   defaultConfig,
   type GlobeArc,
+  type FocusOptions,
   type GlobeAssets,
   type GlobeConfig,
   type GlobeMarker,
@@ -69,6 +70,19 @@ const defaultTextureUrls: GlobeTextureUrls = {
 const HIGHLIGHT_TEXTURE_SCALE = 0.5
 // A resolução cai, no máximo até aqui, quando a placa de vídeo não dá conta de 60 quadros por segundo.
 const MIN_PIXEL_RATIO = 0.75
+
+const DEFAULT_FLIGHT_MS = 900
+
+interface Flight {
+  from: { yaw: number; pitch: number; distance: number }
+  to: { yaw: number; pitch: number; distance: number }
+  start: number
+  duration: number
+}
+
+function easeInOut(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
 
 export interface GlobeViewOptions {
   regions: Region[]
@@ -140,6 +154,11 @@ export class GlobeView {
 
   private cameraKey = ''
   private distance = defaultConfig.camera.distance
+  private targetDistance = defaultConfig.camera.distance
+  private flight: Flight | null = null
+  private readonly pointers = new Map<number, { x: number; y: number }>()
+  private pinchStart = 0
+  private pinchBase = 0
   private yaw = 0
   private pitch = 0.15
   private dragging = false
@@ -193,9 +212,12 @@ export class GlobeView {
           })
     this.visibilityObserver?.observe(root)
 
+    canvas.style.touchAction = 'none'
+    canvas.addEventListener('wheel', this.onWheel, { passive: false })
     canvas.addEventListener('pointerdown', this.onPointerDown)
     canvas.addEventListener('pointermove', this.onPointerMove)
     window.addEventListener('pointerup', this.onPointerUp)
+    window.addEventListener('pointercancel', this.onPointerUp)
     canvas.addEventListener('pointerleave', this.onPointerLeave)
 
     this.raf = requestAnimationFrame(this.frame)
@@ -214,24 +236,53 @@ export class GlobeView {
     return regions.map((region) => `${region.id}:${region.border ?? ''}:${region.fill ?? ''}:${region.locked ? 1 : 0}`).join('|')
   }
 
-  focus(id: string) {
+  focus(id: string, options?: FocusOptions) {
     const feature = this.features.find((item) => item.code === id)
     const region = this.options.regions.find((item) => item.id === id)
     if (feature) {
       const [minLng, minLat, maxLng, maxLat] = feature.bbox
-      this.lookAt((minLat + maxLat) / 2, (minLng + maxLng) / 2)
+      this.flyTo((minLat + maxLat) / 2, (minLng + maxLng) / 2, options)
       return
     }
     if (!region) {
       const marker = this.markerLayer.positionOf(id)
-      if (marker) this.lookAt(marker.lat, marker.lng)
+      if (marker) this.flyTo(marker.lat, marker.lng, options)
       return
     }
     const ring = region.geometry.type === 'Polygon' ? region.geometry.coordinates[0] : region.geometry.coordinates[0]?.[0]
     if (!ring?.length) return
     const lng = ring.reduce((sum, point) => sum + point[0], 0) / ring.length
     const lat = ring.reduce((sum, point) => sum + point[1], 0) / ring.length
-    this.lookAt(lat, lng)
+    this.flyTo(lat, lng, options)
+  }
+
+  // Voo suave até um ponto, pelo caminho mais curto em longitude. Qualquer gesto do usuário cancela.
+  private flyTo(lat: number, lng: number, options: FocusOptions = {}) {
+    const duration = options.duration ?? DEFAULT_FLIGHT_MS
+    const [x, y, z] = latLngToSphere(lat, lng, 1)
+    const pitch = Math.asin(Math.max(-1, Math.min(1, y)))
+    let yaw = Math.atan2(x, z)
+    const distance = Math.max(
+      this.options.config.minDistance,
+      Math.min(this.options.config.maxDistance, options.distance ?? this.targetDistance),
+    )
+    if (duration <= 0 || !this.loaded) {
+      this.flight = null
+      this.yaw = yaw
+      this.pitch = pitch
+      this.distance = this.targetDistance = distance
+      this.applyOrbit()
+      return
+    }
+    const turn = ((yaw - this.yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI
+    yaw = this.yaw + turn
+    this.flight = {
+      from: { yaw: this.yaw, pitch: this.pitch, distance: this.distance },
+      to: { yaw, pitch, distance },
+      start: performance.now(),
+      duration,
+    }
+    this.targetDistance = distance
   }
 
   // Destaque fixo: o hover do ponteiro pinta por cima, mas ao sair da região volta para ele.
@@ -254,9 +305,11 @@ export class GlobeView {
     this.resizeObserver.disconnect()
     this.visibilityObserver?.disconnect()
     const canvas = this.renderer.domElement
+    canvas.removeEventListener('wheel', this.onWheel)
     canvas.removeEventListener('pointerdown', this.onPointerDown)
     canvas.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
+    window.removeEventListener('pointercancel', this.onPointerUp)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
     this.heat?.dispose()
     this.borders?.geometry.dispose()
@@ -548,7 +601,8 @@ export class GlobeView {
     const cameraKey = `${config.camera.lat}|${config.camera.lng}|${config.camera.distance}|${config.camera.fov}`
     if (cameraKey !== this.cameraKey) {
       this.cameraKey = cameraKey
-      this.distance = config.camera.distance
+      this.distance = this.targetDistance = config.camera.distance
+      this.flight = null
       this.lookAt(config.camera.lat, config.camera.lng)
     }
   }
@@ -609,9 +663,25 @@ export class GlobeView {
       this.updateHover()
     }
 
-    if (this.options.config.autoRotate && !this.dragging) {
-      this.yaw += delta * this.options.config.rotateSpeed
+    if (this.flight) {
+      const t = Math.min(1, (performance.now() - this.flight.start) / this.flight.duration)
+      const e = easeInOut(t)
+      const { from, to } = this.flight
+      this.yaw = from.yaw + (to.yaw - from.yaw) * e
+      this.pitch = from.pitch + (to.pitch - from.pitch) * e
+      this.distance = from.distance + (to.distance - from.distance) * e
+      if (t >= 1) this.flight = null
       this.applyOrbit()
+    } else {
+      if (Math.abs(this.targetDistance - this.distance) > 0.0005) {
+        // Aproximação exponencial: o zoom da roda desacelera até parar, em vez de saltar.
+        this.distance += (this.targetDistance - this.distance) * (1 - Math.exp(-delta * 12))
+        this.applyOrbit()
+      }
+      if (this.options.config.autoRotate && !this.dragging) {
+        this.yaw += delta * this.options.config.rotateSpeed
+        this.applyOrbit()
+      }
     }
 
     if (this.shader) {
@@ -718,8 +788,35 @@ export class GlobeView {
     return { type: region.geometry.type, coordinates: region.geometry.coordinates }
   }
 
+  private onWheel = (event: WheelEvent) => {
+    const { config } = this.options
+    if (!config.interactive || !config.zoom) return
+    // Rola o zoom do globo em vez da página enquanto o ponteiro está sobre ele.
+    event.preventDefault()
+    this.flight = null
+    const lines = event.deltaMode === 1 ? 16 : 1
+    const factor = Math.exp(event.deltaY * lines * 0.0012)
+    this.targetDistance = this.clampDistance(this.targetDistance * factor)
+  }
+
+  private clampDistance(distance: number) {
+    const { minDistance, maxDistance } = this.options.config
+    return Math.max(minDistance, Math.min(maxDistance, distance))
+  }
+
+  private pinchDistance() {
+    const [a, b] = [...this.pointers.values()]
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+  }
+
   private onPointerDown = (event: PointerEvent) => {
     if (!this.options.config.interactive) return
+    this.flight = null
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (this.pointers.size === 2 && this.options.config.zoom) {
+      this.pinchStart = this.pinchDistance()
+      this.pinchBase = this.targetDistance
+    }
     this.setPointer(event)
     this.dragging = true
     this.moved = false
@@ -728,12 +825,26 @@ export class GlobeView {
 
   private onPointerMove = (event: PointerEvent) => {
     this.setPointer(event)
+    if (this.pointers.has(event.pointerId)) this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (this.dragging && this.pinchStart > 0 && this.pointers.size >= 2) {
+      // Dois dedos: a distância entre eles controla o zoom, e o globo não gira.
+      this.moved = true
+      const current = this.pinchDistance()
+      if (current > 0) {
+        this.targetDistance = this.clampDistance((this.pinchBase * this.pinchStart) / current)
+        this.distance = this.targetDistance
+        this.applyOrbit()
+      }
+      return
+    }
     if (this.dragging) {
+      // Perto do globo o mesmo arrasto gira menos, para o movimento acompanhar o dedo.
+      const near = Math.max(0.25, Math.min(1.5, (this.distance - GLOBE_RADIUS) / (defaultConfig.camera.distance - GLOBE_RADIUS)))
       const dx = event.clientX - this.pointerDown.x
       const dy = event.clientY - this.pointerDown.y
       if (dx * dx + dy * dy > 16) this.moved = true
-      this.yaw -= event.movementX * 0.005
-      this.pitch = Math.max(-1.05, Math.min(1.05, this.pitch - event.movementY * 0.003))
+      this.yaw -= event.movementX * 0.005 * near
+      this.pitch = Math.max(-1.05, Math.min(1.05, this.pitch - event.movementY * 0.003 * near))
       this.applyOrbit()
     }
 
@@ -769,6 +880,8 @@ export class GlobeView {
   }
 
   private onPointerUp = (event: PointerEvent) => {
+    this.pointers.delete(event.pointerId)
+    if (this.pointers.size < 2) this.pinchStart = 0
     if (!this.dragging) return
     this.setPointer(event)
     this.dragging = false

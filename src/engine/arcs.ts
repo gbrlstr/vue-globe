@@ -76,7 +76,7 @@ export class ArcLayer {
 
   private stampOf(arcs: GlobeArc[], config: GlobeConfig) {
     const list = arcs
-      .map((a) => `${a.id}:${a.from.lat}:${a.from.lng}:${a.to.lat}:${a.to.lng}:${[a.color ?? ''].flat().join('>')}`)
+      .map((a) => `${a.id}:${a.from.lat}:${a.from.lng}:${a.from.altitude ?? 0}:${a.to.lat}:${a.to.lng}:${a.to.altitude ?? 0}:${a.altitude ?? ''}:${[a.color ?? ''].flat().join('>')}`)
       .join('|')
     return `${list}#${config.colors.arc}|${config.arcWidth}|${config.arcDash}|${config.arcSpeed}`
   }
@@ -123,21 +123,26 @@ export class ArcLayer {
     const a = new Vector3(...latLngToSphere(from.lat, from.lng, 1))
     const b = new Vector3(...latLngToSphere(to.lat, to.lng, 1))
     const angle = a.angleTo(b)
-    if (!(angle > 0.001)) return null
+    const fromRadius = GLOBE_RADIUS * (SURFACE + Math.max(0, from.altitude ?? 0))
+    const toRadius = GLOBE_RADIUS * (SURFACE + Math.max(0, to.altitude ?? 0))
+    const start = a.clone().multiplyScalar(fromRadius)
+    const end = b.clone().multiplyScalar(toRadius)
+    // Mesmo ponto no chão e no ar (ex.: satélite sobre a estação): ainda existe um arco vertical.
+    if (!(angle > 0.001) && start.distanceTo(end) < 0.01) return null
 
-    const surface = GLOBE_RADIUS * SURFACE
-    const altitude = Math.max(MIN_ALTITUDE, MAX_ALTITUDE * (angle / Math.PI)) * GLOBE_RADIUS
+    const peak =
+      arc.altitude !== undefined && Number.isFinite(arc.altitude)
+        ? Math.max(0, arc.altitude)
+        : Math.max(MIN_ALTITUDE, MAX_ALTITUDE * (angle / Math.PI))
     // Pontos opostos: a soma dos vetores é nula, então escolhe um eixo qualquer para subir.
     const middle = a.clone().add(b)
     if (middle.lengthSq() < 1e-8) middle.set(0, 1, 0)
     middle.normalize()
-    // Para o ponto médio da curva quadrática ficar `altitude` acima da superfície.
-    const controlRadius = 2 * (surface + altitude) - surface * Math.cos(angle / 2)
-    return new QuadraticBezierCurve3(
-      a.clone().multiplyScalar(surface),
-      middle.multiplyScalar(controlRadius),
-      b.clone().multiplyScalar(surface),
-    )
+    // O ponto médio de uma curva quadrática é 1/4 do início + 1/2 do controle + 1/4 do fim.
+    // Escolhe o controle para esse ponto ficar `peak` acima da altura média das pontas.
+    const mid = middle.clone().multiplyScalar((fromRadius + toRadius) / 2 + peak * GLOBE_RADIUS)
+    const control = mid.multiplyScalar(2).sub(start.clone().add(end).multiplyScalar(0.5))
+    return new QuadraticBezierCurve3(start, control, end)
   }
 
   private colorsFor(arc: GlobeArc, config: GlobeConfig): [string, string] {

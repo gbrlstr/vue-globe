@@ -21,7 +21,7 @@
     <Globe :markers="visible" :config="config"></Globe>
     <div class="panel">
       <h1>Satellites</h1>
-      <p>Simulated circular orbits, not real tracking data. Each dot is the point on the ground right under a satellite.</p>
+      <p>Simulated circular orbits, not real tracking data. Each dot is a satellite, and its thin line goes down to the point on the ground right under it. Heights are compressed so every orbit fits on screen.</p>
       <div class="row">
         <button v-for="g in groups" :key="g.name" :class="{ on: g.on }" @click="g.on = !g.on">
           <i class="swatch" :style="{ background: g.color }"></i>{{ g.name }}
@@ -59,6 +59,8 @@
             raan: (p / planes) * Math.PI * (group === 1 ? 1 : 2), // polar planes only span half a turn
             phase: ((k + (p % 2) * 0.5) / perPlane) * 2 * Math.PI,
             inc: (inclination * Math.PI) / 180, period,
+            // Real heights (400 to 20,000 km) squeezed on a log scale into 6% to 26% of the globe radius.
+            altitude: 0.04 + 0.12 * Math.log10(altitude / 300),
           })
         }
       }
@@ -82,7 +84,7 @@
         const groups = reactive(GROUPS.map(([name, color]) => ({ name, color, on: true })))
         const clock = ref(0)
         const config = reactive({
-          markerLabels: 'hover', markerSize: 0.022, autoRotate: true, rotateSpeed: 0.05, showClouds: false, showCells: false,
+          markerLabels: 'hover', markerSize: 0.025, autoRotate: true, rotateSpeed: 0.05, showClouds: false, showCells: false,
           camera: { lat: 20, lng: -30, distance: 6.4, fov: 40 },
         })
         let simTime = 0, last = performance.now(), lastTick = 0
@@ -94,7 +96,7 @@
         }
         requestAnimationFrame(frame)
         const visible = computed(() =>
-          sats.filter((s) => groups[s.group].on).map((s) => ({ id: s.id, label: s.label, color: s.color, ...groundPoint(s, clock.value) })),
+          sats.filter((s) => groups[s.group].on).map((s) => ({ id: s.id, label: s.label, color: s.color, altitude: s.altitude, ...groundPoint(s, clock.value) })),
         )
         return { speed, groups, visible, config }
       },

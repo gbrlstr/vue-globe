@@ -6,6 +6,7 @@ import {
   resolveConfig,
   type GlobeArc,
   type GlobeAssets,
+  type FocusOptions,
   type GlobeConfig,
   type GlobeMarker,
   type Region,
@@ -57,8 +58,8 @@ function sync() {
   })
 }
 
-function focus(id: string) {
-  view?.focus(id)
+function focus(id: string, options?: FocusOptions) {
+  view?.focus(id, options)
 }
 
 function highlight(id: string | null) {

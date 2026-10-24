@@ -37,12 +37,16 @@ export interface GlobeMarker {
   label?: string
   /** Cor do pino. Sem ela, usa `config.colors.marker`. */
   color?: string
+  /** Altura acima da superfície, em raios do globo (0,1 = 10% do raio). Com altura, o pino ganha uma haste até o chão. */
+  altitude?: number
   data?: unknown
 }
 
 export interface LatLng {
   lat: number
   lng: number
+  /** Altura acima da superfície, em raios do globo. Para ligar, por exemplo, um satélite a uma estação no chão. */
+  altitude?: number
 }
 
 export interface GlobeArc {
@@ -51,6 +55,8 @@ export interface GlobeArc {
   to: LatLng
   /** Uma cor, ou `[cor do início, cor do fim]` para um degradê. Sem ela, usa `config.colors.arc`. */
   color?: string | [string, string]
+  /** Altura do ponto mais alto do arco, em raios do globo. Sem ela, cresce com a distância entre as pontas. */
+  altitude?: number
   data?: unknown
 }
 
@@ -71,6 +77,13 @@ export interface GlobeColors {
 
 export type MarkerLabelMode = 'always' | 'hover' | 'never'
 
+export interface FocusOptions {
+  /** Duração do voo da câmera, em milissegundos. Com 0 a câmera salta direto. Padrão: 900. */
+  duration?: number
+  /** Distância da câmera ao final do voo. Sem ela, mantém a atual. */
+  distance?: number
+}
+
 export interface GlobeCamera {
   lat: number
   lng: number
@@ -82,6 +95,12 @@ export interface GlobeConfig {
   autoRotate: boolean
   rotateSpeed: number
   interactive: boolean
+  /** Zoom com a roda do mouse e o gesto de pinça. */
+  zoom: boolean
+  /** Distância mínima da câmera ao centro do globo (o globo tem raio 2). */
+  minDistance: number
+  /** Distância máxima da câmera ao centro do globo. */
+  maxDistance: number
   /** Idioma dos nomes de país (código BCP 47, como `pt-BR`). Só vale para países sem nome no mapa. */
   locale: string
   showLines: boolean
@@ -131,6 +150,9 @@ export const defaultConfig: GlobeConfig = {
   autoRotate: true,
   rotateSpeed: 0.12,
   interactive: true,
+  zoom: true,
+  minDistance: 2.8,
+  maxDistance: 12,
   locale: 'en',
   showLines: true,
   showGrid: true,
