@@ -13,26 +13,40 @@ Click an image to open the live example. The source of each one is a single HTML
 <table>
   <tr>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/01-explorador-de-paises/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-explorador-de-paises/preview.png" alt="Country explorer" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/01-explorador-de-paises/"><b>Country explorer</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/01-country-explorer/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-country-explorer/preview.png" alt="Country explorer" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/01-country-explorer/"><b>Country explorer</b></a>
     </td>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/02-mapa-de-calor-brasil/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-mapa-de-calor-brasil/preview.png" alt="Brazil heat map" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/02-mapa-de-calor-brasil/"><b>Brazil heat map</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/02-brazil-heatmap/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-brazil-heatmap/preview.png" alt="Brazil heat map" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/02-brazil-heatmap/"><b>Brazil heat map</b></a>
     </td>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/03-rotas-aereas/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-rotas-aereas/preview.png" alt="Flight routes" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/03-rotas-aereas/"><b>Flight routes</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/03-flight-routes/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-flight-routes/preview.png" alt="Flight routes" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/03-flight-routes/"><b>Flight routes</b></a>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/04-cidades-com-marcadores/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-cidades-com-marcadores/preview.png" alt="Cities with markers" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/04-cidades-com-marcadores/"><b>Cities with markers</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/04-city-markers/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-city-markers/preview.png" alt="Cities with markers" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/04-city-markers/"><b>Cities with markers</b></a>
     </td>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/05-temas/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-temas/preview.png" alt="Themes" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/05-temas/"><b>Themes</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/05-themes/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-themes/preview.png" alt="Themes" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/05-themes/"><b>Themes</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/06-population-heatmap/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/06-population-heatmap/preview.png" alt="Population heatmap" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/06-population-heatmap/"><b>Population heatmap</b></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/07-satellites/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/07-satellites/preview.png" alt="Satellites" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/07-satellites/"><b>Satellites</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/08-us-international-outbound/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/08-us-international-outbound/preview.png" alt="US international outbound" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/08-us-international-outbound/"><b>US international outbound</b></a>
     </td>
     <td width="33%"></td>
   </tr>
@@ -117,7 +131,7 @@ const regions = [
 </template>
 ```
 
-See the [Brazil heat map example](./examples/02-mapa-de-calor-brasil) for a full one: it builds 27 regions from the bundled map and colors them by population density.
+See the [Brazil heat map example](./examples/02-brazil-heatmap) for a full one: it builds 27 regions from the bundled map and colors them by population density.
 
 ### Controlling the globe from code
 
@@ -241,7 +255,7 @@ To serve them from somewhere else, such as a CDN, pass `assets`. Every field is 
 ## Notes
 
 - **Server rendering.** The WebGL scene is created in `onMounted`, so on the server only an empty container is rendered. In Nuxt, wrapping the component in `<ClientOnly>` is the safe choice. This has not been tested in a Nuxt project yet.
-- **Scale.** Markers and arcs are meant for dozens of items. Thousands are not optimized yet.
+- **Scale.** Markers and arcs are meant for dozens of items (the satellites example moves about 100 markers at 20 updates per second). Thousands are not optimized yet.
 - **Brazil state ids.** In the bundled map, `region.id` for a Brazilian or US state is the country code (`BRA`, `USA`), and the state is in `region.name`. For per-state control, build your own regions as in the heat map example.
 - **Map data.** The bundled map is a compacted version of a public world dataset. Check its license before using it commercially.
 

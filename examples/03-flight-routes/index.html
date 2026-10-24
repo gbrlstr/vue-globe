@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rotas aéreas · vue-globe</title>
+  <link rel="stylesheet" href="../../dist/vue-globe.css" />
+  <link rel="stylesheet" href="../example.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "vue": "https://unpkg.com/vue@3.5.44/dist/vue.esm-browser.prod.js",
+        "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+        "vue-globe": "../../dist/vue-globe.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <Globe :arcs="arcs" :markers="airports" :config="config"></Globe>
+    <div class="panel">
+      <h1>Rotas aéreas</h1>
+      <p>Arcos animados com degradê entre aeroportos. A altura do arco cresce com a distância.</p>
+      <div class="row">
+        <button :class="{ on: config.showArcs }" @click="config.showArcs = !config.showArcs">Arcos</button>
+        <button :class="{ on: config.arcSpeed > 0 }" @click="config.arcSpeed = config.arcSpeed > 0 ? 0 : 0.6">Animação</button>
+        <button :class="{ on: config.autoRotate }" @click="config.autoRotate = !config.autoRotate">Girar</button>
+      </div>
+      <label class="range">Espessura <input type="range" min="0.004" max="0.025" step="0.001" v-model.number="config.arcWidth" /></label>
+      <label class="range">Trecho aceso <input type="range" min="0.1" max="1" step="0.05" v-model.number="config.arcDash" /></label>
+      <div class="stat"><b>{{ arcs.length }} rotas · {{ airports.length }} aeroportos</b><span>Cada rota aceita uma cor ou <code>[início, fim]</code></span></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp, ref, reactive, computed } from 'vue'
+    import { Globe } from 'vue-globe'
+
+    const AIRPORTS = {
+      GRU: { lat: -23.43, lng: -46.47, label: 'São Paulo' },
+      FOR: { lat: -3.78, lng: -38.53, label: 'Fortaleza' },
+      LIS: { lat: 38.77, lng: -9.13, label: 'Lisboa' },
+      JFK: { lat: 40.64, lng: -73.78, label: 'Nova York' },
+      LHR: { lat: 51.47, lng: -0.45, label: 'Londres' },
+      DXB: { lat: 25.25, lng: 55.36, label: 'Dubai' },
+      SIN: { lat: 1.36, lng: 103.99, label: 'Singapura' },
+      SYD: { lat: -33.94, lng: 151.18, label: 'Sydney' },
+      NRT: { lat: 35.77, lng: 140.39, label: 'Tóquio' },
+      SFO: { lat: 37.62, lng: -122.38, label: 'São Francisco' },
+      JNB: { lat: -26.13, lng: 28.24, label: 'Joanesburgo' },
+    }
+    const ROUTES = [
+      ['GRU', 'LIS'], ['FOR', 'LIS'], ['GRU', 'JFK'], ['JFK', 'LHR'], ['LIS', 'JFK'], ['LHR', 'DXB'],
+      ['DXB', 'SIN'], ['SIN', 'SYD'], ['NRT', 'SFO'], ['SFO', 'JFK'], ['GRU', 'JNB'], ['JNB', 'DXB'], ['DXB', 'NRT'],
+    ]
+    const PALETTE = [['#ff8a3d', '#ffd23f'], ['#4ade80', '#2dd4bf'], ['#60a5fa', '#a78bfa'], ['#f472b6', '#fb7185']]
+
+    createApp({
+      components: { Globe },
+      setup() {
+        const airports = Object.entries(AIRPORTS).map(([id, a]) => ({ id, ...a }))
+        const arcs = ROUTES.map(([from, to], i) => ({
+          id: `${from}-${to}`,
+          from: AIRPORTS[from],
+          to: AIRPORTS[to],
+          color: PALETTE[i % PALETTE.length],
+        }))
+        const config = reactive({
+          autoRotate: true, rotateSpeed: 0.1, showClouds: false, showCells: false, markerLabels: 'hover', markerSize: 0.03,
+          arcWidth: 0.01, arcDash: 0.4, arcSpeed: 0.6, camera: { lat: 25, lng: 20, distance: 6.8, fov: 40 },
+        })
+        return { airports, arcs, config }
+      },
+    }).mount('#app')
+  </script>
+</body>
+</html>

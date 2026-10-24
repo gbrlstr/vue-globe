@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Temas · vue-globe</title>
+  <link rel="stylesheet" href="../../dist/vue-globe.css" />
+  <link rel="stylesheet" href="../example.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "vue": "https://unpkg.com/vue@3.5.44/dist/vue.esm-browser.prod.js",
+        "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+        "vue-globe": "../../dist/vue-globe.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <Globe :config="config" :markers="markers" :arcs="arcs"></Globe>
+    <div class="panel">
+      <h1>Temas</h1>
+      <p>Tudo que é cor vem de <code>config.colors</code>. Troque o tema sem recarregar o globo.</p>
+      <div class="row">
+        <button v-for="(t, name) in themes" :key="name" :class="{ on: current === name }" @click="current = name">{{ name }}</button>
+      </div>
+      <label class="range">Linhas <input type="range" min="0" max="1" step="0.05" v-model.number="lines" /></label>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp, ref, reactive, computed } from 'vue'
+    import { Globe } from 'vue-globe'
+
+    const themes = {
+      Clássico: {},
+      Neon: {
+        colors: { background: '#05010f', ocean: '#12033d', border: '#ff2bd6', fill: '#00e5ff', grid: '#7a3cff', atmosphere: '#b84dff',
+          marker: '#00e5ff', arc: '#ff2bd6', label: '#ffffff', labelBackground: 'rgba(10, 2, 30, 0.85)' },
+      },
+      Floresta: {
+        colors: { background: '#04110b', ocean: '#0b3d2e', border: '#c8f7d4', fill: '#f5a623', grid: '#6fcf97', atmosphere: '#4fb286',
+          marker: '#f5a623', arc: '#fff1b8', label: '#eafff1', labelBackground: 'rgba(4, 17, 11, 0.82)' },
+      },
+      Papel: {
+        colors: { background: '#f2eee3', ocean: '#cfd9e4', border: '#2a3b4d', fill: '#c0392b', grid: '#8aa0b5', atmosphere: '#9fb6cc',
+          marker: '#c0392b', arc: '#1f2d3d', label: '#1f2d3d', labelBackground: 'rgba(242, 238, 227, 0.9)' },
+      },
+    }
+    const markers = [
+      { id: 'a', lat: -3.73, lng: -38.52, label: 'Fortaleza' },
+      { id: 'b', lat: 38.72, lng: -9.14, label: 'Lisboa' },
+      { id: 'c', lat: 35.68, lng: 139.69, label: 'Tóquio' },
+      { id: 'd', lat: 40.71, lng: -74.0, label: 'Nova York' },
+    ]
+    const arcs = [
+      { id: 'a-b', from: markers[0], to: markers[1] },
+      { id: 'b-c', from: markers[1], to: markers[2] },
+      { id: 'd-b', from: markers[3], to: markers[1] },
+    ]
+
+    createApp({
+      components: { Globe },
+      setup() {
+        const current = ref('Neon')
+        const lines = ref(0.8)
+        const config = computed(() => ({
+          ...themes[current.value], lineOpacity: lines.value, showCells: false, showClouds: false,
+          autoRotate: true, rotateSpeed: 0.12, arcWidth: 0.01, camera: { lat: 15, lng: -20, distance: 6.4, fov: 40 },
+        }))
+        return { themes, current, lines, config, markers, arcs }
+      },
+    }).mount('#app')
+  </script>
+</body>
+</html>

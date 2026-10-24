@@ -13,26 +13,40 @@ Clique em uma imagem para abrir o exemplo ao vivo. O código de cada um é um ú
 <table>
   <tr>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/01-explorador-de-paises/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-explorador-de-paises/preview.png" alt="Explorador de países" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/01-explorador-de-paises/"><b>Explorador de países</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/01-country-explorer/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/01-country-explorer/preview.png" alt="Explorador de países" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/01-country-explorer/"><b>Explorador de países</b></a>
     </td>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/02-mapa-de-calor-brasil/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-mapa-de-calor-brasil/preview.png" alt="Mapa de calor do Brasil" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/02-mapa-de-calor-brasil/"><b>Mapa de calor do Brasil</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/02-brazil-heatmap/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/02-brazil-heatmap/preview.png" alt="Mapa de calor do Brasil" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/02-brazil-heatmap/"><b>Mapa de calor do Brasil</b></a>
     </td>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/03-rotas-aereas/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-rotas-aereas/preview.png" alt="Rotas aéreas" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/03-rotas-aereas/"><b>Rotas aéreas</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/03-flight-routes/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/03-flight-routes/preview.png" alt="Rotas aéreas" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/03-flight-routes/"><b>Rotas aéreas</b></a>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/04-cidades-com-marcadores/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-cidades-com-marcadores/preview.png" alt="Cidades com marcadores" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/04-cidades-com-marcadores/"><b>Cidades com marcadores</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/04-city-markers/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/04-city-markers/preview.png" alt="Cidades com marcadores" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/04-city-markers/"><b>Cidades com marcadores</b></a>
     </td>
     <td align="center" width="33%">
-      <a href="https://gbrlstr.github.io/vue-globe/examples/05-temas/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-temas/preview.png" alt="Temas" width="100%"></a><br>
-      <a href="https://gbrlstr.github.io/vue-globe/examples/05-temas/"><b>Temas</b></a>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/05-themes/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/05-themes/preview.png" alt="Temas" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/05-themes/"><b>Temas</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/06-population-heatmap/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/06-population-heatmap/preview.png" alt="Mapa de calor da população" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/06-population-heatmap/"><b>Mapa de calor da população</b></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/07-satellites/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/07-satellites/preview.png" alt="Satélites" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/07-satellites/"><b>Satélites</b></a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://gbrlstr.github.io/vue-globe/examples/08-us-international-outbound/"><img src="https://raw.githubusercontent.com/gbrlstr/vue-globe/main/examples/08-us-international-outbound/preview.png" alt="Saídas internacionais dos EUA" width="100%"></a><br>
+      <a href="https://gbrlstr.github.io/vue-globe/examples/08-us-international-outbound/"><b>Saídas internacionais dos EUA</b></a>
     </td>
     <td width="33%"></td>
   </tr>
@@ -117,7 +131,7 @@ const regions = [
 </template>
 ```
 
-O [exemplo do mapa de calor](./examples/02-mapa-de-calor-brasil) mostra um caso completo: monta 27 regiões a partir do mapa embutido e colore cada uma pela densidade demográfica.
+O [exemplo do mapa de calor](./examples/02-brazil-heatmap) mostra um caso completo: monta 27 regiões a partir do mapa embutido e colore cada uma pela densidade demográfica.
 
 ### Controlar o globo por código
 

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Satellites · vue-globe</title>
+  <link rel="stylesheet" href="../../dist/vue-globe.css" />
+  <link rel="stylesheet" href="../example.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "vue": "https://unpkg.com/vue@3.5.44/dist/vue.esm-browser.prod.js",
+        "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+        "vue-globe": "../../dist/vue-globe.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <Globe :markers="visible" :config="config"></Globe>
+    <div class="panel">
+      <h1>Satellites</h1>
+      <p>Simulated circular orbits, not real tracking data. Each dot is the point on the ground right under a satellite.</p>
+      <div class="row">
+        <button v-for="g in groups" :key="g.name" :class="{ on: g.on }" @click="g.on = !g.on">
+          <i class="swatch" :style="{ background: g.color }"></i>{{ g.name }}
+        </button>
+      </div>
+      <label class="range">Speed <input type="range" min="1" max="600" step="1" v-model.number="speed" /> <span>×{{ speed }}</span></label>
+      <div class="stat"><b>{{ visible.length }} satellites</b><span>Orbit height, tilt and period come from each group</span></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp, ref, reactive, computed } from 'vue'
+    import { Globe } from 'vue-globe'
+
+    const EARTH_RADIUS = 6371       // km
+    const MU = 398600.4418          // km³/s²
+    const EARTH_SPIN = 7.2921159e-5 // rad/s
+
+    // [name, color, altitude km, inclination °, orbital planes, satellites per plane]
+    const GROUPS = [
+      ['Low shell, 53°', '#60a5fa', 550, 53, 12, 6],
+      ['Polar, 97°', '#4ade80', 700, 97.6, 6, 5],
+      ['Navigation, 55°', '#f472b6', 20200, 55, 3, 4],
+      ['Space station', '#ffd23f', 420, 51.6, 1, 1],
+    ]
+
+    const sats = []
+    for (const [group, [name, color, altitude, inclination, planes, perPlane]] of GROUPS.entries()) {
+      const radius = EARTH_RADIUS + altitude
+      const period = 2 * Math.PI * Math.sqrt(radius ** 3 / MU)
+      for (let p = 0; p < planes; p++) {
+        for (let k = 0; k < perPlane; k++) {
+          sats.push({
+            id: `${group}-${p}-${k}`, label: `${name} #${p * perPlane + k + 1}`, color, group,
+            raan: (p / planes) * Math.PI * (group === 1 ? 1 : 2), // polar planes only span half a turn
+            phase: ((k + (p % 2) * 0.5) / perPlane) * 2 * Math.PI,
+            inc: (inclination * Math.PI) / 180, period,
+          })
+        }
+      }
+    }
+
+    function groundPoint(sat, t) {
+      const theta = sat.phase + (2 * Math.PI * t) / sat.period
+      const ci = Math.cos(sat.inc), si = Math.sin(sat.inc)
+      const x = Math.cos(sat.raan) * Math.cos(theta) - Math.sin(sat.raan) * ci * Math.sin(theta)
+      const y = Math.sin(sat.raan) * Math.cos(theta) + Math.cos(sat.raan) * ci * Math.sin(theta)
+      const z = si * Math.sin(theta)
+      let lng = ((Math.atan2(y, x) - EARTH_SPIN * t) * 180) / Math.PI
+      lng = ((((lng + 180) % 360) + 360) % 360) - 180
+      return { lat: (Math.asin(z) * 180) / Math.PI, lng }
+    }
+
+    createApp({
+      components: { Globe },
+      setup() {
+        const speed = ref(120)
+        const groups = reactive(GROUPS.map(([name, color]) => ({ name, color, on: true })))
+        const clock = ref(0)
+        const config = reactive({
+          markerLabels: 'hover', markerSize: 0.022, autoRotate: true, rotateSpeed: 0.05, showClouds: false, showCells: false,
+          camera: { lat: 20, lng: -30, distance: 6.4, fov: 40 },
+        })
+        let simTime = 0, last = performance.now(), lastTick = 0
+        function frame(now) {
+          simTime += ((now - last) / 1000) * speed.value
+          last = now
+          if (now - lastTick > 50) { clock.value = simTime; lastTick = now } // ~20 updates per second
+          requestAnimationFrame(frame)
+        }
+        requestAnimationFrame(frame)
+        const visible = computed(() =>
+          sats.filter((s) => groups[s.group].on).map((s) => ({ id: s.id, label: s.label, color: s.color, ...groundPoint(s, clock.value) })),
+        )
+        return { speed, groups, visible, config }
+      },
+    }).mount('#app')
+  </script>
+</body>
+</html>

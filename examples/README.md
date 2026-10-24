@@ -4,11 +4,14 @@ Each folder has an `index.html` and a `preview.png`. The pages are plain HTML wi
 
 | Example | Shows |
 | --- | --- |
-| [01 · Country explorer](./01-explorador-de-paises) | `regionHover`, `regionClick`, `focus()`, `config.locale` |
-| [02 · Brazil heat map](./02-mapa-de-calor-brasil) | `regions` with `fill`, `regionOpacity`, building regions from the bundled map |
-| [03 · Flight routes](./03-rotas-aereas) | `arcs` with gradients, `arcWidth`, `arcDash`, `arcSpeed`, markers |
-| [04 · Cities with markers](./04-cidades-com-marcadores) | `markers`, `markerClick`, `markerLabels`, camera flights |
-| [05 · Themes](./05-temas) | `config.colors` swapped at runtime |
+| [01 · Country explorer](./01-country-explorer) | `regionHover`, `regionClick`, `focus()`, `config.locale` |
+| [02 · Brazil heat map](./02-brazil-heatmap) | `regions` with `fill`, `regionOpacity`, building regions from the bundled map |
+| [03 · Flight routes](./03-flight-routes) | `arcs` with gradients, `arcWidth`, `arcDash`, `arcSpeed`, markers |
+| [04 · Cities with markers](./04-city-markers) | `markers`, `markerClick`, `markerLabels`, camera flights |
+| [05 · Themes](./05-themes) | `config.colors` swapped at runtime |
+| [06 · Population heatmap](./06-population-heatmap) | `regions` with `fill` for 80 countries on a log color scale |
+| [07 · Satellites](./07-satellites) | `markers` moving in real time (simulated orbits) |
+| [08 · US international outbound](./08-us-international-outbound) | Filled `regions`, hub `markers` and filtered `arcs` together |
 
 Live: <https://gbrlstr.github.io/vue-globe/examples/>
 
@@ -21,6 +24,6 @@ npm install
 npm run examples
 ```
 
-Then open the address it prints, followed by `/examples/01-explorador-de-paises/`. The pages must be served over HTTP: opening the files directly (`file://`) blocks the module imports.
+Then open the address it prints, followed by `/examples/01-country-explorer/`. The pages must be served over HTTP: opening the files directly (`file://`) blocks the module imports.
 
 To use an example in your own project, copy its `<script type="module">` block into a component and replace the import map with `import { Globe } from 'vue-globe'`.

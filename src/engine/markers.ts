@@ -52,6 +52,7 @@ export class MarkerLayer {
 
   private config: GlobeConfig | null = null
   private stamp = ''
+  private positionStamp = ''
   private hoveredId: string | null = null
   private labelsHidden = false
 
@@ -72,9 +73,17 @@ export class MarkerLayer {
     this.config = config
     this.group.visible = config.showMarkers
     const stamp = this.stampOf(markers, config)
-    if (stamp === this.stamp) return
-    this.stamp = stamp
-    this.rebuild(markers, config)
+    if (stamp !== this.stamp) {
+      this.stamp = stamp
+      this.positionStamp = this.positionStampOf(markers)
+      this.rebuild(markers, config)
+      return
+    }
+    // Só as coordenadas mudaram (marcador em movimento): move os pinos sem recriar nada.
+    const positionStamp = this.positionStampOf(markers)
+    if (positionStamp === this.positionStamp) return
+    this.positionStamp = positionStamp
+    this.move(markers)
   }
 
   setHover(id: string | null) {
@@ -163,9 +172,27 @@ export class MarkerLayer {
   }
 
   private stampOf(markers: GlobeMarker[], config: GlobeConfig) {
-    const list = markers.map((m) => `${m.id}:${m.lat}:${m.lng}:${m.label ?? ''}:${m.color ?? ''}`).join('|')
+    const list = markers.map((m) => `${m.id}:${m.label ?? ''}:${m.color ?? ''}:${Number.isFinite(m.lat + m.lng)}`).join('|')
     const { colors } = config
     return `${list}#${colors.marker}|${colors.label}|${colors.labelBackground}|${config.markerLabels}`
+  }
+
+  private positionStampOf(markers: GlobeMarker[]) {
+    return markers.map((m) => `${m.lat}:${m.lng}`).join('|')
+  }
+
+  private move(markers: GlobeMarker[]) {
+    const moved = new Set<string>()
+    for (const marker of markers) {
+      const item = this.items.get(marker.id)
+      if (!item || moved.has(marker.id) || !Number.isFinite(marker.lat + marker.lng)) continue
+      moved.add(marker.id)
+      const [x, y, z] = latLngToSphere(marker.lat, marker.lng, GLOBE_RADIUS * LIFT)
+      item.marker = marker
+      item.position.set(x, y, z)
+      item.normal.copy(item.position).normalize()
+      for (const mesh of [item.dot, item.halo, item.hit]) mesh.position.copy(item.position)
+    }
   }
 
   private rebuild(markers: GlobeMarker[], config: GlobeConfig) {

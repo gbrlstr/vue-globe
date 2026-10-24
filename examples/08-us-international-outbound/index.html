@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>US international outbound · vue-globe</title>
+  <link rel="stylesheet" href="../../dist/vue-globe.css" />
+  <link rel="stylesheet" href="../example.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "vue": "https://unpkg.com/vue@3.5.44/dist/vue.esm-browser.prod.js",
+        "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+        "vue-globe": "../../dist/vue-globe.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <Globe :regions="regions" :markers="hubMarkers" :arcs="shownArcs" :config="config" @marker-click="pick" @pointer-miss="current = null"
+           @region-hover="hovered = $event?.region ?? null"></Globe>
+    <div class="panel">
+      <h1>US international outbound</h1>
+      <p>Illustrative routes from five US hubs, not real schedules. Click a hub to see only its routes.</p>
+      <div class="row">
+        <button :class="{ on: !current }" @click="current = null">All hubs</button>
+        <button v-for="h in HUBS" :key="h.id" :class="{ on: current === h.id }" @click="current = h.id">{{ h.id }}</button>
+      </div>
+      <div class="stat">
+        <template v-if="hovered?.data?.hub"><b>{{ hovered.name }}</b><span>Served from {{ hovered.data.hub }}</span></template>
+        <template v-else><b>{{ shownArcs.length }} routes</b><span>Hover a highlighted country</span></template>
+      </div>
+    </div>
+    <div class="legend">
+      <i class="swatch" style="background:#3b82f6"></i>United States
+      <i class="swatch" style="background:#ff8a3d;margin-left:14px"></i>Destination countries
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp, ref, reactive, computed } from 'vue'
+    import { Globe } from 'vue-globe'
+
+    const WORLD = new URL('../../dist/assets/data/world-main.json', import.meta.url)
+
+    const HUBS = [
+      { id: 'JFK', lat: 40.64, lng: -73.78, label: 'New York' },
+      { id: 'MIA', lat: 25.79, lng: -80.29, label: 'Miami' },
+      { id: 'ORD', lat: 41.98, lng: -87.9, label: 'Chicago' },
+      { id: 'LAX', lat: 33.94, lng: -118.41, label: 'Los Angeles' },
+      { id: 'SEA', lat: 47.45, lng: -122.31, label: 'Seattle' },
+    ]
+    // [hub, country code, country name, airport latitude, airport longitude]
+    const ROUTES = [
+      ['JFK','GBR','United Kingdom',51.47,-0.45],['JFK','FRA','France',49.01,2.55],['JFK','DEU','Germany',50.03,8.57],
+      ['JFK','ESP','Spain',40.47,-3.56],['JFK','ITA','Italy',41.8,12.25],['JFK','IRL','Ireland',53.42,-6.27],
+      ['JFK','IND','India',28.56,77.1],['JFK','ARE','United Arab Emirates',25.25,55.36],['JFK','EGY','Egypt',30.12,31.41],
+      ['MIA','BRA','Brazil',-23.43,-46.47],['MIA','ARG','Argentina',-34.82,-58.54],['MIA','COL','Colombia',4.7,-74.15],
+      ['MIA','MEX','Mexico',19.44,-99.07],['MIA','PRT','Portugal',38.77,-9.13],
+      ['ORD','NLD','Netherlands',52.31,4.76],['ORD','POL','Poland',52.17,20.97],['ORD','ISR','Israel',32.01,34.88],
+      ['ORD','CAN','Canada',43.68,-79.61],['ORD','ZAF','South Africa',-26.13,28.24],
+      ['LAX','JPN','Japan',35.55,139.78],['LAX','KOR','South Korea',37.46,126.44],['LAX','AUS','Australia',-33.94,151.18],
+      ['LAX','CHN','China',31.14,121.81],['LAX','NZL','New Zealand',-37.01,174.79],['LAX','PHL','Philippines',14.51,121.02],
+      ['SEA','ISL','Iceland',63.99,-22.62],['SEA','TWN','Taiwan',25.08,121.23],['SEA','THA','Thailand',13.69,100.75],
+    ]
+    const HUB_COLORS = { JFK: ['#ff8a3d', '#ffd23f'], MIA: ['#4ade80', '#2dd4bf'], ORD: ['#a78bfa', '#f472b6'], LAX: ['#60a5fa', '#a78bfa'], SEA: ['#fb7185', '#ffd23f'] }
+
+    createApp({
+      components: { Globe },
+      setup() {
+        const regions = ref([])
+        const hovered = ref(null)
+        const current = ref(null)
+        const config = reactive({
+          autoRotate: true, rotateSpeed: 0.06, showClouds: false, showCells: false, markerLabels: 'always', markerSize: 0.035,
+          arcWidth: 0.008, arcDash: 0.5, arcSpeed: 0.5, regionOpacity: 0.8, camera: { lat: 32, lng: -100, distance: 6.8, fov: 40 },
+        })
+        const hubOf = new Map(ROUTES.map(([hub, code]) => [code, hub]))
+        fetch(WORLD).then((r) => r.json()).then((features) => {
+          regions.value = features
+            .filter((f) => f.properties.code === 'USA' || hubOf.has(f.properties.code))
+            .map((f, i) => {
+              const us = f.properties.code === 'USA'
+              const route = ROUTES.find((r) => r[1] === f.properties.code)
+              return {
+                id: `${f.properties.code}-${i}`, name: us ? 'United States' : route[2], geometry: f.geometry,
+                fill: us ? '#3b82f6' : '#ff8a3d', data: us ? null : { hub: HUBS.find((h) => h.id === hubOf.get(f.properties.code)).label },
+              }
+            })
+        })
+        const arcs = ROUTES.map(([hub, code, , lat, lng]) => ({
+          id: `${hub}-${code}`, hub, from: HUBS.find((h) => h.id === hub), to: { lat, lng }, color: HUB_COLORS[hub],
+        }))
+        const shownArcs = computed(() => arcs.filter((a) => !current.value || a.hub === current.value))
+        const hubMarkers = HUBS.map((h) => ({ ...h, color: '#ffffff' }))
+        function pick(marker) { current.value = marker.id }
+        return { regions, hovered, current, config, HUBS, hubMarkers, shownArcs, pick }
+      },
+    }).mount('#app')
+  </script>
+</body>
+</html>
