@@ -226,14 +226,21 @@ export class GlobeView {
 
   setOptions(options: GlobeViewOptions) {
     const regionsChanged = this.regionsStamp(options.regions) !== this.regionsStamp(this.options.regions)
+    const fillsChanged = this.fillsStamp(options.regions) !== this.fillsStamp(this.options.regions)
     this.options = options
     if (!this.loaded) return
     this.applyAppearance()
     if (regionsChanged) this.rebuildCustomLines()
+    // Só as cores mudaram (mapa animado, como uma apuração): repinta a textura e mantém as linhas.
+    else if (fillsChanged) this.paintRegionFills()
   }
 
   private regionsStamp(regions: Region[]) {
-    return regions.map((region) => `${region.id}:${region.border ?? ''}:${region.fill ?? ''}:${region.locked ? 1 : 0}`).join('|')
+    return regions.map((region) => `${region.id}:${region.border ?? ''}:${region.locked ? 1 : 0}`).join('|')
+  }
+
+  private fillsStamp(regions: Region[]) {
+    return regions.map((region) => region.fill ?? '').join('|')
   }
 
   focus(id: string, options?: FocusOptions) {
@@ -500,13 +507,9 @@ export class GlobeView {
   }
 
   private rebuildCustomLines() {
-    for (const child of [...this.customLines.children]) {
-      this.customLines.remove(child)
-      if (child instanceof LineSegments) {
-        child.geometry.dispose()
-        if (child.material instanceof LineBasicMaterial) child.material.dispose()
-      }
-    }
+    // Os materiais antigos só são descartados depois de criar os novos: se o programa de shader perdesse
+    // o último uso no meio da troca, o WebGL teria de compilá-lo de novo a cada atualização.
+    const previous = [...this.customLines.children]
     this.paintRegionFills()
 
     // Uma chamada de desenho por cor de borda, não uma por anel de cada região.
@@ -529,6 +532,13 @@ export class GlobeView {
       lines.raycast = () => {}
       lines.frustumCulled = false
       this.customLines.add(lines)
+    }
+    for (const child of previous) {
+      this.customLines.remove(child)
+      if (child instanceof LineSegments) {
+        child.geometry.dispose()
+        if (child.material instanceof LineBasicMaterial) child.material.dispose()
+      }
     }
   }
 

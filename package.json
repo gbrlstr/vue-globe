@@ -1,6 +1,6 @@
 {
   "name": "vue-globe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Interactive WebGL globe for Vue 3: countries, markers, animated arcs and choropleth regions.",

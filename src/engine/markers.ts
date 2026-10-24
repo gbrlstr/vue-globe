@@ -56,6 +56,8 @@ export class MarkerLayer {
   private readonly materials = new Map<string, MarkerMaterials>()
   private readonly geometry = new SphereGeometry(1, 16, 12)
   private readonly hitMaterial = new MeshBasicMaterial({ visible: false })
+  // Um só material para as hastes, mantido entre reconstruções: recriá-lo recompilaria o shader a cada atualização.
+  private readonly stemMaterial = new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false })
   private readonly labelHost: HTMLDivElement
   private readonly cameraPosition = new Vector3()
   private readonly cameraDirection = new Vector3()
@@ -181,6 +183,7 @@ export class MarkerLayer {
     this.materials.clear()
     this.geometry.dispose()
     this.hitMaterial.dispose()
+    this.stemMaterial.dispose()
     this.labelHost.remove()
   }
 
@@ -278,10 +281,7 @@ export class MarkerLayer {
     const geometry = new BufferGeometry()
     geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(elevated.length * 6), 3))
     geometry.setAttribute('color', new Float32BufferAttribute(colors, 3))
-    this.stems = new LineSegments(
-      geometry,
-      new LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false }),
-    )
+    this.stems = new LineSegments(geometry, this.stemMaterial)
     this.stems.frustumCulled = false
     this.stems.raycast = () => {}
     this.stems.renderOrder = 5
@@ -367,7 +367,6 @@ export class MarkerLayer {
     if (this.stems) {
       this.group.remove(this.stems)
       this.stems.geometry.dispose()
-      if (this.stems.material instanceof LineBasicMaterial) this.stems.material.dispose()
       this.stems = null
     }
   }

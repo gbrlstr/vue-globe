@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.1.1
+
+### Fixed
+- Updating `markers`, `arcs` or `regions` repeatedly (animated maps, live data) no longer recompiles WebGL shaders on every update: materials are now released only after the new ones exist. In a software-rendered test an update went from about 1.5 s to about 80 ms.
+- Changing only `Region.fill` repaints the fill texture and keeps the border lines instead of rebuilding them.
+- Filling regions that do not cross the antimeridian no longer draws two extra copies of each polygon.
+
 ## 0.1.0
 
 ### Added

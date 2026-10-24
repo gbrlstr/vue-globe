@@ -82,7 +82,8 @@ export class ArcLayer {
   }
 
   private rebuild(arcs: GlobeArc[], config: GlobeConfig) {
-    this.clear()
+    // Descarta os arcos antigos só no fim, para o programa de shader não ser destruído e recompilado a cada troca.
+    const previous = this.meshes.splice(0)
     const seen = new Set<string>()
     for (const arc of arcs) {
       if (seen.has(arc.id)) continue
@@ -113,6 +114,15 @@ export class ArcLayer {
       mesh.raycast = () => {}
       this.group.add(mesh)
       this.meshes.push(mesh)
+    }
+    this.release(previous)
+  }
+
+  private release(meshes: Mesh[]) {
+    for (const mesh of meshes) {
+      this.group.remove(mesh)
+      mesh.geometry.dispose()
+      if (mesh.material instanceof ShaderMaterial) mesh.material.dispose()
     }
   }
 
@@ -152,12 +162,7 @@ export class ArcLayer {
   }
 
   private clear() {
-    for (const mesh of this.meshes) {
-      this.group.remove(mesh)
-      mesh.geometry.dispose()
-      if (mesh.material instanceof ShaderMaterial) mesh.material.dispose()
-    }
-    this.meshes.length = 0
+    this.release(this.meshes.splice(0))
   }
 }
 

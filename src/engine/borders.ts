@@ -244,6 +244,8 @@ export function paintGeometry(
     }
 
     for (const offset of [0, -360, 360]) {
+      // A cópia deslocada só serve a polígonos que cruzam o meio-dia do mapa; os outros ficam fora da textura.
+      if (maxLng + offset < -180 || minLng + offset > 180) continue
       ctx.beginPath()
       for (let i = 0; i < outer.length; i++) {
         const point = outer[i]
